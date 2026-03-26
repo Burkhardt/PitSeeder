@@ -1,0 +1,36 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "pits: Bulk Seed Sample",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "build pits",
+			"program": "${workspaceFolder}/pits/bin/Debug/net10.0/pits.dll",
+			"cwd": "${workspaceFolder}/pits",
+			"args": [
+				"-wwwa",
+				"${workspaceFolder}/pits/sample"
+			],
+			"console": "integratedTerminal"
+		},
+		{
+			"name": "pits: Single Person Seed",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "build pits",
+			"program": "${workspaceFolder}/pits/bin/Debug/net10.0/pits.dll",
+			"cwd": "${workspaceFolder}/pits",
+			"args": [
+				"-pit",
+				"Person",
+				"-file",
+				"${workspaceFolder}/pits/sample/Person.json5"
+			],
+			"console": "integratedTerminal"
+		}
+	]
+}

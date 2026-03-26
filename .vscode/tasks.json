@@ -1,0 +1,16 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build pits",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"${workspaceFolder}/pits/pits.csproj"
+			],
+			"group": "build",
+			"problemMatcher": "$msCompile"
+		}
+	]
+}
