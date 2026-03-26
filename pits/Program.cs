@@ -1,90 +1,168 @@
 ﻿using System;
-using System.Linq;
 using Newtonsoft.Json.Linq;
 using JsonPit;
 using OsLib;
-using RaiUtils; // Assuming TextFile and RaiPath live in these namespaces
 
-Console.WriteLine("========================================");
-Console.WriteLine(" 🚀 AfricaStage Pit Seeder CLI");
-Console.WriteLine("========================================");
-
-// 1. CLI Argument Routing & Help
-if (args.Length == 0 || args.Contains("-h") || args.Contains("--help"))
+public static class Icons
 {
-	Console.WriteLine("Usage:");
-	Console.WriteLine("  Bulk Seed (Ontology Standard):");
-	Console.WriteLine("    dotnet run -- -wwwa <SourceDirectoryPath>");
-	Console.WriteLine("  Single Pit Seed:");
-	Console.WriteLine("    dotnet run -- -pit <PitName> -file <SourceFile.json5>");
-	return;
+	public const string Error = "\uea87";
+	public const string Warning = "\uf071";
+	public const string Success = "\ueab2";
+	public const string Info = "\uea74";
+	public const string Help = "\uf059";
 }
 
-// 2. Resolve the OneDrive Cloud Storage Path using OsLib
-var baseRoot = Os.CloudStorageRootDir / "Nomsa.net" / "AfricaStagePits";
-Console.WriteLine($"📂 Target Storage Root: {baseRoot.Path}");
-
-// 3. The "-wwwa" Bulk Seeder Logic
-var wwwaIndex = Array.IndexOf(args, "-wwwa");
-if (wwwaIndex >= 0 && args.Length > wwwaIndex + 1)
+public static class Messages
 {
-	var dirPath = args[wwwaIndex + 1];
-	var sourceDir = new RaiPath(dirPath);
-
-	Console.WriteLine($"\n🌊 Initiating WWWA Bulk Seed from: {sourceDir.Path}");
-
-	// Process all four foundational pits
-	SeedPit(new RaiFile(sourceDir, "Person.json5"), baseRoot, "Person");
-	SeedPit(new RaiFile(sourceDir, "Place.json5"), baseRoot, "Place");
-	SeedPit(new RaiFile(sourceDir, "Object.json5"), baseRoot, "Object");
-	SeedPit(new RaiFile(sourceDir, "Activity.json5"), baseRoot, "Activity");
-
-	Console.WriteLine("\n✅ Bulk seeding complete! Data is safe in the Pits.");
-	return;
-}
-
-// 4. Single Pit Seeder Logic
-var pitIndex = Array.IndexOf(args, "-pit");
-var fileIndex = Array.IndexOf(args, "-file");
-
-if (pitIndex >= 0 && fileIndex >= 0 && args.Length > pitIndex + 1 && args.Length > fileIndex + 1)
-{
-	var pitName = args[pitIndex + 1];
-	var sourceFile = new RaiFile(args[fileIndex + 1]);
-
-	Console.WriteLine($"\n🎯 Initiating Single Seed for: {pitName}");
-	SeedPit(sourceFile, baseRoot, pitName);
-	Console.WriteLine("\n✅ Single seed complete!");
-}
-
-// --- Core Seeding Method ---
-static void SeedPit(RaiFile sourceFile, RaiPath baseRoot, string pitName)
-{
-	Console.WriteLine($"\n📦 Processing {pitName} Pit...");
-
-	try
+	public static readonly string[] Help =
 	{
-		var textFile = new TextFile(sourceFile.FullName);
-		string jsonContent = string.Join(Environment.NewLine, textFile.Lines);
-		
-		// Parse directly into a JArray
-		var jsonArray = JArray.Parse(jsonContent);
-		Console.WriteLine($"   -> Parsed {jsonArray.Count} items from {sourceFile.NameWithExtension}");
+		"-h, --help                 \tprint out all options, replace source and destination with passed-in parameters",
+		"-n, --no-banner            \tDo not display the banner",
+		"-s, --source               \tSingle JSON or JSON5 file or WWWA source directory",
+		"-d, --destination          \tJsonPit destination directory",
+		"--wwwa                     \tRead 4 JSON/JSON5 files into 4 JsonPits",
+		"<source>/Person.json[5]    \t=> <destination>/Person.pit",
+		"<source>/Object.json[5]    \t=> <destination>/Object.pit",
+		"<source>/Place.json[5]     \t=> <destination>/Place.pit",
+		"<source>/Activity.json[5]  \t=> <destination>/Activity.pit",
+		$"{Icons.Info} Os.CloudStorageRootDir: {Os.CloudStorageRootDir.Path}",
+	};
 
-		// Define the target directory for this specific Pit
-		var targetPitDir = (baseRoot / pitName).Path;
+	public static void WriteHighlighted(string text,
+		ConsoleColor foreground = ConsoleColor.Black,
+		ConsoleColor? background = null)
+	{
+		var oldForeground = Console.ForegroundColor;
+		var oldBackground = Console.BackgroundColor;
 
-		// Use the specific UML Constructor: Pit(values: JArray, pitDirectory: string, autoload: bool, ...)
-		// We set autoload: false so it doesn't attempt to hydrate from disk before we overwrite it with our clean seed data.
-		var pit = new Pit(values: jsonArray, pitDirectory: targetPitDir, autoload: false, readOnly: false);
+		Console.ForegroundColor = foreground;
+		Console.BackgroundColor = background ?? oldBackground;
+		Console.WriteLine(text);
 
-		// Persist the JArray directly to the CloudDrive
-		pit.Save(force: true);
-
-		Console.WriteLine($"   -> Successfully initialized and saved {pitName} to {targetPitDir}");
+		Console.ForegroundColor = oldForeground;
+		Console.BackgroundColor = oldBackground;
 	}
-	catch (Exception ex)
+
+	public static void WriteError(string text) =>
+		WriteHighlighted(text, ConsoleColor.DarkRed, ConsoleColor.White);
+
+	public static void WriteSuccess(string text) =>
+		WriteHighlighted(text, ConsoleColor.DarkGreen);
+
+	public static void WriteInfo(string text) =>
+		WriteHighlighted(text, ConsoleColor.Blue);
+
+	public static void WriteLine(string text, char underlineChar = '=')
 	{
-		Console.WriteLine($"   [ERROR] Failed to process {pitName}. Details: {ex.Message}");
+		for (int i = 0; i < text.Length; i++)
+			Console.Write(underlineChar);
+		Console.WriteLine();
+	}
+
+	public static void WriteBanner(string text)
+	{
+		WriteLine(text);
+		Console.WriteLine(text);
+		WriteLine(text);
+	}
+
+	public static void WriteHelp()
+	{
+		foreach (var line in Help)
+			WriteSuccess(line);
+	}
+}
+
+internal static class Program
+{
+	private static int Main(string[] args)
+	{
+		if (ParamValue(args, "-n", "--no-banner") == null)
+			Messages.WriteBanner($"{Icons.Info} AfricaStage Pit Seeder CLI");
+
+		if (ParamValue(args, "-h", "--help") != null)
+		{
+			Messages.WriteHelp();
+			return 0;
+		}
+
+		var source = ParamValue(args, "-s", "--source");
+		var destination = ParamValue(args, "-d", "--destination") ?? (Os.CloudStorageRootDir / "Nomsa.net" / "AfricaStagePits").Path;
+		var wwwa = HasOption(args, "-wwwa", "--wwwa");
+
+		Messages.WriteInfo($"{Icons.Info} Target Storage Root: {destination}");
+		if (wwwa)
+			return RunBulkSeed(source, destination);
+
+		if (source != null)
+			return RunSingleSeed(source, destination);
+
+		Messages.WriteHelp();
+		return 1;
+	}
+
+	private static int RunBulkSeed(string? source, string destination)
+	{
+		if (string.IsNullOrWhiteSpace(source))
+		{
+			Messages.WriteError($"{Icons.Error} Missing source directory for --wwwa.");
+			return 1;
+		}
+		var sourceDir = new RaiPath(source);
+		Messages.WriteInfo($"{Icons.Info} Initiating WWWA Bulk Seed from: {sourceDir.Path}");
+
+		SeedPit(new TextFile(new RaiFile(sourceDir, "Person.json5").FullName), destination, "Person");
+		SeedPit(new TextFile(new RaiFile(sourceDir, "Place.json5").FullName), destination, "Place");
+		SeedPit(new TextFile(new RaiFile(sourceDir, "Object.json5").FullName), destination, "Object");
+		SeedPit(new TextFile(new RaiFile(sourceDir, "Activity.json5").FullName), destination, "Activity");
+		Messages.WriteSuccess($"{Icons.Success} WWWA bulk seeding complete. Data saved to {destination}");
+		return 0;
+	}
+
+	private static int RunSingleSeed(string sourceFile, string destination)
+	{
+		var jsonFile = new TextFile(sourceFile);
+		var pitName = new RaiFile(sourceFile).Name;
+		SeedPit(jsonFile, destination, pitName);
+		return 0;
+	}
+
+	private static string? ParamValue(string[] options, string shortOption, string longOption)
+	{
+		var index = Array.IndexOf(options, shortOption);
+		if (index < 0)
+			index = Array.IndexOf(options, longOption);
+
+		return index >= 0 && index + 1 < options.Length
+			? options[index + 1]
+			: null;
+	}
+
+	private static bool HasOption(string[] options, string shortOption, string longOption)
+	{
+		return Array.IndexOf(options, shortOption) >= 0
+			|| Array.IndexOf(options, longOption) >= 0;
+	}
+
+	private static void SeedPit(TextFile jsonFile, string destination, string pitName)
+	{
+		Messages.WriteInfo($"{Icons.Info} Processing {pitName} Pit...");
+
+		try
+		{
+			var jsonContent = string.Join(Environment.NewLine, jsonFile.Lines);
+			var jsonArray = JArray.Parse(jsonContent);
+			Messages.WriteInfo($"   -> Parsed {jsonArray.Count} items from {jsonFile.NameWithExtension}");
+
+			var targetPitDir = new RaiPath(destination) / pitName;
+			var pit = new Pit(values: jsonArray, pitDirectory: targetPitDir.Path, autoload: false, readOnly: false);
+			pit.Save(force: true);
+
+			Messages.WriteSuccess($"{Icons.Success} Initialized and saved {pitName} to {targetPitDir.Path}");
+		}
+		catch (Exception ex)
+		{
+			Messages.WriteError($"{Icons.Error} Failed to process {pitName}. Details: {ex.Message}");
+		}
 	}
 }
