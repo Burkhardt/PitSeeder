@@ -52,7 +52,7 @@ public static class Messages
 	];
 
 	/// <summary>
-	/// /Users/RSB/Library/CloudStorage/OneDrive/OneDriveData/Nomsa.net/Nomsa/Nomsa.Activity.pit
+	/// Example: ./output/Activity.pit
 	/// </summary>
 	private static string GetCanonicalFullName(string? destination, string nameWithExt)
 	{
@@ -225,7 +225,7 @@ internal static class Program
 			Messages.WriteBanner($"{Icons.Info} AfricaStage Pit Seeder CLI");
 
 		var source = Messages.Source = ParamValue(args, "-s", "--source");
-		var destination = Messages.Destination = ParamValue(args, "-d", "--destination") ?? (Os.CloudStorageRootDir / "Nomsa.net" / "AfricaStagePits").Path;
+		var destination = Messages.Destination = ParamValue(args, "-d", "--destination") ?? new RaiPath("output").Path;
 		var wwwa = Messages.Wwwa = HasOption(args, "-wwwa", "--wwwa");
 		var banner = Messages.Banner = !HasOption(args, "-n", "--nologo");
 

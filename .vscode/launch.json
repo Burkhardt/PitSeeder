@@ -5,7 +5,7 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Create Activity Pit for Nomsa.net",
+			"name": "pits: Bulk Seed Sample",
 			"type": "coreclr",
 			"request": "launch",
 			"preLaunchTask": "build pits",
@@ -15,7 +15,7 @@
 				"-s",
 				"${workspaceFolder}/pits/sample/",
 				"-d",
-				"/Users/RSB/Library/CloudStorage/OneDrive/OneDriveData/Nomsa.net/",
+				"${workspaceFolder}/pits/output",
 				"-wwwa",
 			],
 			"console": "integratedTerminal",
