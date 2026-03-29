@@ -51,6 +51,12 @@ After the package is published to NuGet, users can install it with:
 dotnet tool install --global PitSeeder
 ```
 
+On macOS and Linux, the most practical option is often to install the tool into a standard directory that is already on `PATH`, such as `/usr/local/bin`:
+
+```bash
+sudo dotnet tool install PitSeeder --tool-path /usr/local/bin
+```
+
 Then run:
 
 ```bash
@@ -69,11 +75,19 @@ Uninstall with:
 dotnet tool uninstall --global PitSeeder
 ```
 
+For a `/usr/local/bin` installation, use:
+
+```bash
+sudo dotnet tool update PitSeeder --tool-path /usr/local/bin
+sudo dotnet tool uninstall PitSeeder --tool-path /usr/local/bin
+```
+
 Important tradeoff:
 
 - A .NET tool is convenient to install from NuGet.
 - A .NET tool is usually framework-dependent, not self-contained.
 - Users who do not want any .NET dependency should use the self-contained binaries described later in this document.
+- Installing with `--tool-path /usr/local/bin` avoids adding `~/.dotnet/tools` to `PATH`.
 
 ## Pack And Publish The NuGet Tool
 

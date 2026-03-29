@@ -22,6 +22,12 @@ After the package is published to NuGet:
 dotnet tool install --global PitSeeder
 ```
 
+On macOS or Linux, a more practical option is often to install the tool directly into a directory that is already on your `PATH`, for example `/usr/local/bin`:
+
+```bash
+sudo dotnet tool install PitSeeder --tool-path /usr/local/bin
+```
+
 Run:
 
 ```bash
@@ -29,6 +35,12 @@ pits --help
 ```
 
 This installation method requires a compatible .NET runtime or SDK on the target machine.
+
+To update a `--tool-path` installation:
+
+```bash
+sudo dotnet tool update PitSeeder --tool-path /usr/local/bin
+```
 
 ## Quick Usage
 
