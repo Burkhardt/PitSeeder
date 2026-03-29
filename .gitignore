@@ -4,9 +4,17 @@
 # .NET build output
 bin/
 obj/
+artifacts/
 
 # Publish output
 publish/
+
+# Test and coverage output
+TestResults/
+BenchmarkDotNet.Artifacts/
+*.trx
+*.coverage
+*.coveragexml
 
 # Visual Studio
 .vs/
@@ -25,6 +33,9 @@ _ReSharper*/
 !.vscode/launch.json
 !.vscode/tasks.json
 !.vscode/extensions.json
+
+# Repo-specific generated data
+pits/file/
 
 # NuGet local packages
 *.nupkg

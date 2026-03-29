@@ -4,56 +4,72 @@
 	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
 	"version": "0.2.0",
 	"configurations": [
-
 		{
-			"version": "0.2.0",
-			"configurations": [
-				{
-					"name": "Debug installed pits ",
-					"type": "coreclr",
-					"request": "launch",
-					"program": "/usr/local/bin/pits",
-					"cwd": "/Users/RSB/Projects/PitSeeder/pits",
-					"args": [],
-					"console": "integratedTerminal",
-					"stopAtEntry": true,
-					"justMyCode": true,
-					"requireExactSource": true,
-					"symbolOptions": {
-						"searchPaths": [
-							"/usr/local/bin"
-						]
-					}
-				}
-			]
-		},
-		{
-			"name": "pits: Bulk Seed Sample",
+			"name": "Create Activity Pit for Nomsa.net",
 			"type": "coreclr",
 			"request": "launch",
 			"preLaunchTask": "build pits",
 			"program": "${workspaceFolder}/pits/bin/Debug/net10.0/pits.dll",
 			"cwd": "${workspaceFolder}/pits",
 			"args": [
+				"-s",
+				"${workspaceFolder}/pits/sample/",
+				"-d",
+				"/Users/RSB/Library/CloudStorage/OneDrive/OneDriveData/Nomsa.net/",
 				"-wwwa",
-				"${workspaceFolder}/pits/sample"
 			],
-			"console": "integratedTerminal"
+			"console": "integratedTerminal",
+			"stopAtEntry": true,
+			"justMyCode": true
 		},
 		{
-			"name": "pits: Single Person Seed",
+			"name": "pits: Single Person Seed (Breakpoint In SeedPit)",
 			"type": "coreclr",
 			"request": "launch",
 			"preLaunchTask": "build pits",
 			"program": "${workspaceFolder}/pits/bin/Debug/net10.0/pits.dll",
 			"cwd": "${workspaceFolder}/pits",
 			"args": [
-				"-pit",
-				"Person",
-				"-file",
-				"${workspaceFolder}/pits/sample/Person.json5"
+				"-s",
+				"${workspaceFolder}/pits/sample/Person.json5",
+				"-d",
+				"${workspaceFolder}/pits/output/Person.pit"
 			],
-			"console": "integratedTerminal"
+			"console": "integratedTerminal",
+			"stopAtEntry": true,
+			"justMyCode": true
+		},
+		{
+			"name": "pits: several parameters",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "build pits",
+			"program": "${workspaceFolder}/pits/bin/Debug/net10.0/pits.dll",
+			"cwd": "${workspaceFolder}/pits",
+			"args": [
+				"-s",
+				"${workspaceFolder}/pits/sample/Person.json5",
+				"-d",
+				"${workspaceFolder}/pits/output/Person.pit",
+				"--help",
+				// "-wwwa",
+				// "-n"
+			],
+			"console": "integratedTerminal",
+			"stopAtEntry": true,
+			"justMyCode": true
+		},
+		{
+			"name": "pits: Stop At Main",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "build pits",
+			"program": "${workspaceFolder}/pits/bin/Debug/net10.0/pits.dll",
+			"cwd": "${workspaceFolder}/pits",
+			"args": [],
+			"console": "integratedTerminal",
+			"stopAtEntry": true,
+			"justMyCode": true
 		}
 	]
 }
