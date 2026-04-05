@@ -5,17 +5,31 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
+			"name": "pits: --version",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "build pits (local RAIkeep)",
+			"program": "${workspaceFolder}/pits/bin/Debug/net10.0/pits.dll",
+			"cwd": "${workspaceFolder}/pits",
+			"args": [
+				"-v",
+			],
+			"console": "integratedTerminal",
+			"stopAtEntry": true,
+			"justMyCode": true
+		},
+		{
 			"name": "pits: Bulk Seed Sample",
 			"type": "coreclr",
 			"request": "launch",
-			"preLaunchTask": "build pits",
+			"preLaunchTask": "build pits (local RAIkeep)",
 			"program": "${workspaceFolder}/pits/bin/Debug/net10.0/pits.dll",
 			"cwd": "${workspaceFolder}/pits",
 			"args": [
 				"-s",
 				"${workspaceFolder}/pits/sample/",
 				"-d",
-				"${workspaceFolder}/pits/output",
+				"${workspaceFolder}/pits/output/",
 				"-wwwa",
 			],
 			"console": "integratedTerminal",
@@ -26,7 +40,7 @@
 			"name": "pits: Single Person Seed (Breakpoint In SeedPit)",
 			"type": "coreclr",
 			"request": "launch",
-			"preLaunchTask": "build pits",
+			"preLaunchTask": "build pits (local RAIkeep)",
 			"program": "${workspaceFolder}/pits/bin/Debug/net10.0/pits.dll",
 			"cwd": "${workspaceFolder}/pits",
 			"args": [
@@ -43,7 +57,7 @@
 			"name": "pits: several parameters",
 			"type": "coreclr",
 			"request": "launch",
-			"preLaunchTask": "build pits",
+			"preLaunchTask": "build pits (local RAIkeep)",
 			"program": "${workspaceFolder}/pits/bin/Debug/net10.0/pits.dll",
 			"cwd": "${workspaceFolder}/pits",
 			"args": [
@@ -63,7 +77,7 @@
 			"name": "pits: Stop At Main",
 			"type": "coreclr",
 			"request": "launch",
-			"preLaunchTask": "build pits",
+			"preLaunchTask": "build pits (local RAIkeep)",
 			"program": "${workspaceFolder}/pits/bin/Debug/net10.0/pits.dll",
 			"cwd": "${workspaceFolder}/pits",
 			"args": [],

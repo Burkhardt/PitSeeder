@@ -11,6 +11,19 @@
 			],
 			"group": "build",
 			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "build pits (local RAIkeep)",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"${workspaceFolder}/pits/pits.csproj",
+				"-p:UseLocalRAIkeepSources=true",
+				"-p:RAIkeepRoot=/Users/RSB/Projects/GitHub/RAIkeep"
+			],
+			"group": "build",
+			"problemMatcher": "$msCompile"
 		}
 	]
 }

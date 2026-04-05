@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<Title>PitSeeder</Title>
 		<Description>Command-line seeder for JsonPit data stores.</Description>
-		<Version>0.3.0</Version>
+		<Version>0.5.0</Version>
 		<PackageId>PitSeeder</PackageId>
 		<Author>Rainer Burkhardt</Author>
 		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
@@ -12,7 +12,7 @@
 		<RepositoryUrl>https://github.com/Burkhardt/PitSeeder.git</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
-		<PackageReleaseNotes>Initial public packaging as a dotnet tool, Apache 2.0 licensing, and cross-platform build documentation.</PackageReleaseNotes>
+		<PackageReleaseNotes>0.5.0: built against local source references for OsLib 3.7.3 and JsonPit 3.7.3 while the corresponding NuGet packages are not yet published.</PackageReleaseNotes>
 		<OutputType>Exe</OutputType>
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
@@ -24,6 +24,13 @@
 		<PackageTags>jsonpit;pit;cli;tool</PackageTags>
 		<DeployToUsrLocalBin>false</DeployToUsrLocalBin>
 		<EnableCloudSampleSync>false</EnableCloudSampleSync>
+		<RAIkeepRoot Condition="'$(RAIkeepRoot)' == '' and Exists('../../GitHub/RAIkeep/JsonPit/JsonPit.csproj')">../../GitHub/RAIkeep</RAIkeepRoot>
+		<JsonPitProjectPath Condition="'$(RAIkeepRoot)' != '' and Exists('$(RAIkeepRoot)/JsonPit/JsonPit.csproj')">$(RAIkeepRoot)/JsonPit/JsonPit.csproj</JsonPitProjectPath>
+		<OsLibProjectPath Condition="'$(RAIkeepRoot)' != '' and Exists('$(RAIkeepRoot)/OsLib/OsLib.csproj')">$(RAIkeepRoot)/OsLib/OsLib.csproj</OsLibProjectPath>
+		<UseLocalRAIkeepSources Condition="'$(UseLocalRAIkeepSources)' == '' and '$(JsonPitProjectPath)' != '' and '$(OsLibProjectPath)' != ''">true</UseLocalRAIkeepSources>
+		<UseLocalRAIkeepSources Condition="'$(UseLocalRAIkeepSources)' == ''">false</UseLocalRAIkeepSources>
+		<JsonPitPackageVersion Condition="'$(JsonPitPackageVersion)' == ''">3.7.2</JsonPitPackageVersion>
+		<OsLibPackageVersion Condition="'$(OsLibPackageVersion)' == ''">3.7.2</OsLibPackageVersion>
 
 		<CloudSamplePath Condition="'$(CloudSamplePath)' == ''"></CloudSamplePath>
 	</PropertyGroup>
@@ -32,9 +39,23 @@
 		<None Include="../README.md" Pack="true" PackagePath="\" Link="README.md" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<PackageReference Include="JsonPit" Version="3.7.2" />
-		<PackageReference Include="OsLibCore" Version="3.7.2" />
+	<Target Name="ValidateLocalRAIkeepSources"
+		BeforeTargets="Restore"
+		Condition="'$(UseLocalRAIkeepSources)' == 'true'">
+		<Error Condition="'$(JsonPitProjectPath)' == ''"
+			Text="UseLocalRAIkeepSources=true requires a JsonPit project checkout. Set /p:RAIkeepRoot=/path/to/RAIkeep." />
+		<Error Condition="'$(OsLibProjectPath)' == ''"
+			Text="UseLocalRAIkeepSources=true requires an OsLib project checkout. Set /p:RAIkeepRoot=/path/to/RAIkeep." />
+	</Target>
+
+	<ItemGroup Condition="'$(UseLocalRAIkeepSources)' == 'true'">
+		<ProjectReference Include="$(JsonPitProjectPath)" />
+		<ProjectReference Include="$(OsLibProjectPath)" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(UseLocalRAIkeepSources)' != 'true'">
+		<PackageReference Include="JsonPit" Version="$(JsonPitPackageVersion)" />
+		<PackageReference Include="OsLibCore" Version="$(OsLibPackageVersion)" />
 	</ItemGroup>
 
 	<Target Name="SyncSamplesToCloud"

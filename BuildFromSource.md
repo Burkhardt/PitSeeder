@@ -33,6 +33,12 @@ Restore packages:
 dotnet restore pits/pits.csproj
 ```
 
+To restore against a local `RAIkeep` checkout instead of NuGet packages, append:
+
+```bash
+/p:UseLocalRAIkeepSources=true /p:RAIkeepRoot=/path/to/RAIkeep
+```
+
 Build the project:
 
 ```bash
@@ -212,6 +218,12 @@ For Ubuntu on x64:
 dotnet publish pits/pits.csproj -c Release -r linux-x64 --self-contained true /p:PublishSingleFile=true
 ```
 
+To publish from a local `RAIkeep` source checkout instead of NuGet packages:
+
+```bash
+dotnet publish pits/pits.csproj -c Release -r linux-x64 --self-contained true /p:PublishSingleFile=true /p:UseLocalRAIkeepSources=true /p:RAIkeepRoot=/path/to/RAIkeep
+```
+
 For Ubuntu on ARM64:
 
 ```bash
@@ -230,12 +242,55 @@ sudo cp pits/bin/Release/net10.0/linux-x64/publish/pits.pdb /usr/local/bin/
 sudo chmod 755 /usr/local/bin/pits
 ```
 
+If you are deploying to a remote Ubuntu host such as `Mzansi`, copy the published files to your home directory first:
+
+```bash
+scp pits/bin/Release/net10.0/linux-x64/publish/pits Mzansi:~/pitseeder/linux-x64-publish/
+scp pits/bin/Release/net10.0/linux-x64/publish/pits.pdb Mzansi:~/pitseeder/linux-x64-publish/
+```
+
+Then log into the target machine and install from there:
+
+```bash
+ssh Mzansi
+cd ~/pitseeder/linux-x64-publish
+sudo cp pits /usr/local/bin/
+sudo chmod 755 /usr/local/bin/pits
+```
+
+Copy `pits.pdb` as well if you want debug symbols on the target machine:
+
+```bash
+sudo cp pits.pdb /usr/local/bin/
+```
+
 Verify:
 
 ```bash
 which pits
 pits --help
 ```
+
+Example on `Mzansi`, using the four sample seeding files from the `RAIkeep` checkout:
+
+```bash
+cd /srv/ServerData/OneDriveData/RAIkeep
+pits --wwwa -s sample/ -d WwwaTests/
+```
+
+This creates:
+
+```text
+WwwaTests/Person/Person.pit
+WwwaTests/Object/Object.pit
+WwwaTests/Place/Place.pit
+WwwaTests/Activity/Activity.pit
+```
+
+Important:
+
+- use ASCII hyphens in `--wwwa`
+- do not use a typographic dash such as `—wwwa`, because it will not be recognized as a CLI option
 
 ## Windows
 
