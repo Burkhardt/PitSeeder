@@ -197,7 +197,7 @@ internal static class Program
 				Messages.WriteSuccess(GetVersion());
 				return 0;
 			}
-			if (ParamValue(args, "-n", "--nologo", "—n", "—nologo") == null)
+			if (!HasOption(args, "-n", "--nologo", "—n", "—nologo"))
 				Messages.WriteBanner($"{Icons.Info} AfricaStage Pit Seeder CLI");
 			if (HasOption(args, "-h", "--help", "—h", "—help"))
 			{
@@ -205,11 +205,23 @@ internal static class Program
 				return 0;
 			}
 			var source = Messages.Source = ParamValue(args, "-s", "--source", "—s", "—source");
+			Messages.WriteInfo($"Source: {source}");
 			var destination = Messages.Destination = ParamValue(args, "-d", "--destination", "--dest", "—d", "—destination", "—dest") ?? new RaiPath("output").Path;
+			Messages.WriteInfo($"Destination: {destination}");
 			var wwwa = Messages.Wwwa = HasOption(args, "-wwwa", "--wwwa", "—wwwa");
+			Messages.WriteInfo($"WWWA Mode: {wwwa}");
 			if (wwwa)
 			{
-				var rc = RunBulkSeed(source, destination);
+				if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(destination))
+				{
+					Messages.WriteError("WWWA mode requires a source directory specified with --source \n\tand a destination directory specified with --destination.");
+					return 1;
+				}
+				var sourceDir = new RaiPath(source.EndsWith(Os.DIR) ? source : source + Os.DIR);
+				var destDir = new RaiPath(destination.EndsWith(Os.DIR) ? destination : destination + Os.DIR);
+				Messages.WriteInfo($"WWWA RunBulkSeed {sourceDir.Path} => {destDir.Path} started...");
+				var rc = RunBulkSeed(sourceDir, destDir);
+				Messages.WriteInfo($"WWWA RunBulkSeed {sourceDir.Path} => {destDir.Path} completed.");
 				Messages.WriteHelp();
 				return rc;
 			}
@@ -217,7 +229,7 @@ internal static class Program
 				return RunSingleSeed(source, destination);
 			Messages.WriteHelp();
 		}
-		catch (Exception) { Messages.WriteError($"unknow option; an internal error occurred."); }
+		catch (Exception ex) { Messages.WriteError($"unknow option; an internal error occurred.\n{ex.Message}"); }
 		return 1;
 		#endregion Processing_cli_Params
 	}
@@ -249,16 +261,15 @@ internal static class Program
 		pit.Save();
 		Messages.WriteSuccess($"{Icons.Success} Initialized and saved {pit.JsonFile.Name} to {pit.JsonFile.FullName}");
 	}
-	private static int RunBulkSeed(string? source, string destination)
+	private static int RunBulkSeed(RaiPath sourceDir, RaiPath destDir)
 	{
-		var sourceDir = new RaiPath(source!);
 		Messages.WriteInfo($"{Icons.Info} Initiating WWWA Bulk Seed from: {sourceDir.Path}");
 		foreach (var name in new[] { "Person", "Place", "Object", "Activity" })
 		{
 			var sourceFile = new TextFile(sourceDir, name, "json5");
-			SeedPit(sourceFile, new RaiPath(destination) / name);
+			SeedPit(sourceFile, destDir / name);
 		}
-		Messages.WriteSuccess($"{Icons.Success} WWWA bulk seeding complete. Data saved to {destination}");
+		Messages.WriteSuccess($"{Icons.Success} WWWA bulk seeding complete. Data saved to {destDir.ToString()}");
 		return 0;
 	}
 	private static int RunSingleSeed(string sourceFile, string destination)
