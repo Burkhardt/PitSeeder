@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<Title>PitSeeder</Title>
 		<Description>Command-line seeder for JsonPit data stores.</Description>
-		<Version>0.5.0</Version>
+		<Version>0.6.4</Version>
 		<PackageId>PitSeeder</PackageId>
 		<Author>Rainer Burkhardt</Author>
 		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
@@ -12,7 +12,7 @@
 		<RepositoryUrl>https://github.com/Burkhardt/PitSeeder.git</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
-		<PackageReleaseNotes>0.5.0: built against local source references for OsLib 3.7.3 and JsonPit 3.7.3 while the corresponding NuGet packages are not yet published.</PackageReleaseNotes>
+		<PackageReleaseNotes>0.6.4: built against local source references for OsLib 3.7.3 and JsonPit 3.7.3 while the corresponding NuGet packages are not yet published.</PackageReleaseNotes>
 		<OutputType>Exe</OutputType>
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>

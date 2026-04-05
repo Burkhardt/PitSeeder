@@ -20,6 +20,7 @@ public static class Icons
 }
 public static class Messages
 {
+	public static bool Debug { get; set; } = false;
 	private static readonly string[] WwwaFiles = { "Person", "Object", "Place", "Activity" };
 	public static string? Destination { get; set; }
 	public static string? Source { get; set; }
@@ -165,6 +166,11 @@ public static class Messages
 		WriteHighlighted(text, ConsoleColor.DarkGreen);
 	public static void WriteInfo(string text) =>
 		WriteHighlighted(text, ConsoleColor.Blue);
+	public static void WriteDebug(string text)
+	{
+		if (Debug)
+			WriteHighlighted(text, ConsoleColor.DarkYellow);
+	}
 	public static void WriteLine(string text, char underlineChar = '=')
 	{
 		for (int i = 0; i < text.Length; i++)
@@ -197,6 +203,8 @@ internal static class Program
 				Messages.WriteSuccess(GetVersion());
 				return 0;
 			}
+			if (HasOption(args, "-b", "--debug"))
+				Messages.Debug = true;
 			if (!HasOption(args, "-n", "--nologo", "—n", "—nologo"))
 				Messages.WriteBanner($"{Icons.Info} AfricaStage Pit Seeder CLI");
 			if (HasOption(args, "-h", "--help", "—h", "—help"))
@@ -219,9 +227,9 @@ internal static class Program
 				}
 				var sourceDir = new RaiPath(source.EndsWith(Os.DIR) ? source : source + Os.DIR);
 				var destDir = new RaiPath(destination.EndsWith(Os.DIR) ? destination : destination + Os.DIR);
-				Messages.WriteInfo($"WWWA RunBulkSeed {sourceDir.Path} => {destDir.Path} started...");
+				Messages.WriteInfo($"WWWA RunBulkSeed({sourceDir.Path}, {destDir.Path}) started...");
 				var rc = RunBulkSeed(sourceDir, destDir);
-				Messages.WriteInfo($"WWWA RunBulkSeed {sourceDir.Path} => {destDir.Path} completed.");
+				Messages.WriteInfo($"WWWA RunBulkSeed({sourceDir.Path}, {destDir.Path}) completed.");
 				Messages.WriteHelp();
 				return rc;
 			}
@@ -255,8 +263,12 @@ internal static class Program
 	#region Seeding Methods
 	private static void SeedPit(TextFile source, RaiPath pitDirectory)
 	{
-		var pit = new Pit(pitDirectory, readOnly: false);
-		Messages.WriteInfo($"{Icons.Info} Processing {pit.JsonFile.Name} Pit...");
+		Messages.WriteInfo($"Seeding pit from source file: {source.FullName} to destination directory: {pitDirectory.ToString()}");
+		var pitFile = new PitFile(pitDirectory, source.Name);
+		Messages.WriteDebug($"Seeding pit from pitFile: {pitFile.FullName}");
+		//var pit = new Pit(pitDirectory, readOnly: false);
+		var pit = new Pit(pitFile, readOnly: false);
+		Messages.WriteDebug($"{Icons.Info} Processing {pit.JsonFile.Name} Pit...");
 		pit.AddItems(source.ReadAllText());
 		pit.Save();
 		Messages.WriteSuccess($"{Icons.Success} Initialized and saved {pit.JsonFile.Name} to {pit.JsonFile.FullName}");
@@ -266,8 +278,10 @@ internal static class Program
 		Messages.WriteInfo($"{Icons.Info} Initiating WWWA Bulk Seed from: {sourceDir.Path}");
 		foreach (var name in new[] { "Person", "Place", "Object", "Activity" })
 		{
-			var sourceFile = new TextFile(sourceDir, name, "json5");
+			var sourceFile = new TextFile(sourceDir, name, ext: "json5");
+			Messages.WriteDebug($"SeedPit({sourceFile.FullName}, {(destDir / name).ToString()})...");
 			SeedPit(sourceFile, destDir / name);
+			Messages.WriteDebug($"SeedPit({sourceFile.FullName}, {(destDir / name).ToString()}) completed.");
 		}
 		Messages.WriteSuccess($"{Icons.Success} WWWA bulk seeding complete. Data saved to {destDir.ToString()}");
 		return 0;

@@ -36,6 +36,7 @@ _ReSharper*/
 
 # Repo-specific generated data
 pits/file/
+pits/output/
 
 # NuGet local packages
 *.nupkg
