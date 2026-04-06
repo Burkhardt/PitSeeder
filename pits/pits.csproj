@@ -24,6 +24,7 @@
 		<PackageTags>jsonpit;pit;cli;tool</PackageTags>
 		<DeployToUsrLocalBin>false</DeployToUsrLocalBin>
 		<EnableCloudSampleSync>false</EnableCloudSampleSync>
+		<RAIkeepRoot Condition="'$(RAIkeepRoot)' == '' and Exists('../../JsonPit/JsonPit.csproj') and Exists('../../OsLib/OsLib.csproj')">../..</RAIkeepRoot>
 		<RAIkeepRoot Condition="'$(RAIkeepRoot)' == '' and Exists('../../GitHub/RAIkeep/JsonPit/JsonPit.csproj')">../../GitHub/RAIkeep</RAIkeepRoot>
 		<JsonPitProjectPath Condition="'$(RAIkeepRoot)' != '' and Exists('$(RAIkeepRoot)/JsonPit/JsonPit.csproj')">$(RAIkeepRoot)/JsonPit/JsonPit.csproj</JsonPitProjectPath>
 		<OsLibProjectPath Condition="'$(RAIkeepRoot)' != '' and Exists('$(RAIkeepRoot)/OsLib/OsLib.csproj')">$(RAIkeepRoot)/OsLib/OsLib.csproj</OsLibProjectPath>
