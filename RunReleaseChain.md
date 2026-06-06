@@ -1,7 +1,7 @@
 # How to run next time:
 
 <code>cd /Users/rsb/Project2026/GitHub/RAIkeep
-release-chain.sh 3.8.15</code>
+release-chain.sh 3.9.0</code>
 
 ## About running inside the LLM:
 
