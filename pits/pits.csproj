@@ -2,17 +2,18 @@
 
 	<PropertyGroup>
 		<Title>PitSeeder</Title>
-		<Description>Command-line seeder for JsonPit data stores.</Description>
-		<Version>0.6.4</Version>
+		<Description>Command-line tool for seeding, exporting, and querying JsonPit data stores. Supports WWWA foreign key resolution, JSON export to file or stdout, and piping to jq.</Description>
+		<Version>3.8.11</Version>
 		<PackageId>PitSeeder</PackageId>
-		<Author>Rainer Burkhardt</Author>
+		<Authors>Rainer Burkhardt</Authors>
 		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<PackageProjectUrl>https://github.com/Burkhardt/PitSeeder</PackageProjectUrl>
-		<RepositoryUrl>https://github.com/Burkhardt/PitSeeder.git</RepositoryUrl>
+		<PackageIcon>HardCastle.png</PackageIcon>
+		<PackageProjectUrl>https://github.com/Burkhardt/RAIkeep</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/Burkhardt/RAIkeep.git</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
-		<PackageReleaseNotes>0.6.4: built against local source references for OsLib 3.7.3 and JsonPit 3.7.3 while the corresponding NuGet packages are not yet published.</PackageReleaseNotes>
+		<PackageReleaseNotes>3.8.11: aligns the PitSeeder CLI with the coordinated 3.8.11 workspace release line and updated package references.</PackageReleaseNotes>
 		<OutputType>Exe</OutputType>
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
@@ -24,20 +25,21 @@
 		<PackageTags>jsonpit;pit;cli;tool</PackageTags>
 		<DeployToUsrLocalBin>false</DeployToUsrLocalBin>
 		<EnableCloudSampleSync>false</EnableCloudSampleSync>
-		<RAIkeepRoot Condition="'$(RAIkeepRoot)' == '' and Exists('../../JsonPit/JsonPit.csproj') and Exists('../../OsLib/OsLib.csproj')">../..</RAIkeepRoot>
+		<RAIkeepRoot Condition="'$(RAIkeepRoot)' == '' and Exists('../../JsonPit/JsonPit.csproj')">../..</RAIkeepRoot>
 		<RAIkeepRoot Condition="'$(RAIkeepRoot)' == '' and Exists('../../GitHub/RAIkeep/JsonPit/JsonPit.csproj')">../../GitHub/RAIkeep</RAIkeepRoot>
 		<JsonPitProjectPath Condition="'$(RAIkeepRoot)' != '' and Exists('$(RAIkeepRoot)/JsonPit/JsonPit.csproj')">$(RAIkeepRoot)/JsonPit/JsonPit.csproj</JsonPitProjectPath>
 		<OsLibProjectPath Condition="'$(RAIkeepRoot)' != '' and Exists('$(RAIkeepRoot)/OsLib/OsLib.csproj')">$(RAIkeepRoot)/OsLib/OsLib.csproj</OsLibProjectPath>
 		<UseLocalRAIkeepSources Condition="'$(UseLocalRAIkeepSources)' == '' and '$(JsonPitProjectPath)' != '' and '$(OsLibProjectPath)' != ''">true</UseLocalRAIkeepSources>
 		<UseLocalRAIkeepSources Condition="'$(UseLocalRAIkeepSources)' == ''">false</UseLocalRAIkeepSources>
-		<JsonPitPackageVersion Condition="'$(JsonPitPackageVersion)' == ''">3.7.2</JsonPitPackageVersion>
-		<OsLibPackageVersion Condition="'$(OsLibPackageVersion)' == ''">3.7.2</OsLibPackageVersion>
+		<JsonPitPackageVersion Condition="'$(JsonPitPackageVersion)' == ''">3.8.11</JsonPitPackageVersion>
+		<OsLibPackageVersion Condition="'$(OsLibPackageVersion)' == ''">3.8.11</OsLibPackageVersion>
 
 		<CloudSamplePath Condition="'$(CloudSamplePath)' == ''"></CloudSamplePath>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<None Include="../README.md" Pack="true" PackagePath="\" Link="README.md" />
+		<None Include="../../HardCastle.png" Pack="true" PackagePath="\" Link="HardCastle.png" />
 	</ItemGroup>
 
 	<Target Name="ValidateLocalRAIkeepSources"

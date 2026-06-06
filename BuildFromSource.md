@@ -2,17 +2,19 @@
 
 This document describes how to build and publish `pits` from source as a self-contained command-line binary for macOS, Ubuntu, and Windows.
 
+PitSeeder now also lives inside the `RAIkeep` repository at `RAIkeep/PitSeeder`. When working from the monorepo, the local `JsonPit` and `OsLib` projects can be used directly without waiting for NuGet publication.
+
 ## Prerequisites
 
 - .NET SDK 10.x installed
 - Git installed
 - Access to the package source used by the project, normally `https://api.nuget.org/v3/index.json`
 
-Clone the repository and move into the root directory:
+Clone the `RAIkeep` repository and move into the `PitSeeder` directory:
 
 ```bash
-git clone <repo-url>
-cd PitSeeder
+git clone <raikeep-repo-url>
+cd RAIkeep/PitSeeder
 ```
 
 ## Project Layout
@@ -23,7 +25,7 @@ The executable project is:
 pits/pits.csproj
 ```
 
-All publish commands below should be run from the repository root.
+All publish commands below should be run from the `PitSeeder` directory.
 
 ## Restore And Build
 
@@ -33,7 +35,9 @@ Restore packages:
 dotnet restore pits/pits.csproj
 ```
 
-To restore against a local `RAIkeep` checkout instead of NuGet packages, append:
+Inside the `RAIkeep` workspace this is not required because the moved project defaults to local source references.
+
+To force local-source restore explicitly, append:
 
 ```bash
 /p:UseLocalRAIkeepSources=true /p:RAIkeepRoot=/path/to/RAIkeep
@@ -96,6 +100,8 @@ Important tradeoff:
 - Installing with `--tool-path /usr/local/bin` avoids adding `~/.dotnet/tools` to `PATH`.
 
 ## Pack And Publish The NuGet Tool
+
+The repository also contains a tag-triggered GitHub Actions workflow at `.github/workflows/publish-pitseeder-nuget.yml`. On a matching `v<version>` tag in the `RAIkeep` repository, that workflow publishes the NuGet tool package and also produces self-contained release assets for `osx-arm64`, `osx-x64`, `linux-x64`, and `win-x64`.
 
 The project is configured so that `dotnet pack` creates a NuGet package for the `pits` command.
 
@@ -275,7 +281,7 @@ Example on `Mzansi`, using the four sample seeding files from the `RAIkeep` chec
 
 ```bash
 cd /srv/ServerData/OneDriveData/RAIkeep
-pits --wwwa -s sample/ -d WwwaTests/
+pits --wwwa -s sample/ -r WwwaTests/
 ```
 
 This creates:

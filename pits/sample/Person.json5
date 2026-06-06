@@ -67,5 +67,9 @@
 	{
 		Id: "MfaniseniThusi",
 		Name: "Mfaniseni Thusi"
+	},
+	{
+		Id: "Rainer",
+		Name: "Dr. Rainer Burkhardt"
 	}
 ]

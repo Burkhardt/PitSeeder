@@ -2,6 +2,7 @@
 	{
 		Id: "SDZSafariPark",
 		Name: "San Diego Zoo Safari Park",
+		Address: "15500 San Pasqual Valley Rd, Escondido, CA 92027",
 		Homepage: "https://sdzsafaripark.org/"
 	},
 	{
@@ -11,7 +12,8 @@
 	},
 	{
 		Id: "SmithRecitalHall",
-		Name: "Smith Recital Hall, SDSU"
+		Name: "Smith Recital Hall, SDSU",
+		Address: "5500 Campanile Dr, San Diego, CA 92182"
 	},
 	{
 		Id: "WinstonsOB",
@@ -26,7 +28,8 @@
 	},
 	{
 		Id: "ConradPrebys",
-		Name: "Conrad Prebys Aztec Student Union, Montezuma Hall"
+		Name: "Conrad Prebys Aztec Student Union, Montezuma Hall",
+		Address: "6075 Aztec Circle Drive, San Diego, CA 92182-7800"
 	},
 	{
 		Id: "StandleyPark",
@@ -35,15 +38,18 @@
 	},
 	{
 		Id: "FallbrookLibrary",
-		Name: "Fallbrook Library"
+		Name: "Fallbrook Library",
+		Address: "124 S. Mission Road, Fallbrook, CA 92028"
 	},
 	{
 		Id: "RanchoGuejito",
-		Name: "Rancho Guejito Vineyard"
+		Name: "Rancho Guejito Vineyard",
+		Address: "17224 San Pasqual Valley Rd, Escondido, CA 92027"
 	},
 	{
 		Id: "CityHeightsAnnex",
-		Name: "City Heights Performance Annex"
+		Name: "City Heights Performance Annex",
+		Address: "3795 Fairmount Ave., San Diego, CA 92105"
 	},
 	{
 		Id: "WaldkindergartenWaging",
@@ -51,15 +57,18 @@
 	},
 	{
 		Id: "RicksCafe",
-		Name: "Rick's Cafe, Ismaning, Germany"
+		Name: "Rick's Cafe, Ismaning, Germany",
+		Address: "Bahnhofstraße 18, 85737 Ismaning, Germany"
 	},
 	{
 		Id: "SorrentoTower",
-		Name: "Sorrento Tower"
+		Name: "Sorrento Tower",
+		Address: "2875 Cowley Way, San Diego, CA 92110"
 	},
 	{
 		Id: "SanDiegoZoo",
-		Name: "San Diego Zoo"
+		Name: "San Diego Zoo",
+		Address: "2920 Zoo Drive, San Diego, CA 92101"
 	},
 	{
 		Id: "HistoricEvent",
