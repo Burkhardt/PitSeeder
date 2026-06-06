@@ -29,6 +29,7 @@
 		<RAIkeepRoot Condition="'$(RAIkeepRoot)' == '' and Exists('../../GitHub/RAIkeep/JsonPit/JsonPit.csproj')">../../GitHub/RAIkeep</RAIkeepRoot>
 		<JsonPitProjectPath Condition="'$(RAIkeepRoot)' != '' and Exists('$(RAIkeepRoot)/JsonPit/JsonPit.csproj')">$(RAIkeepRoot)/JsonPit/JsonPit.csproj</JsonPitProjectPath>
 		<OsLibProjectPath Condition="'$(RAIkeepRoot)' != '' and Exists('$(RAIkeepRoot)/OsLib/OsLib.csproj')">$(RAIkeepRoot)/OsLib/OsLib.csproj</OsLibProjectPath>
+		<UseLocalRAIkeepSources Condition="'$(UseLocalRAIkeepSources)' == '' and '$(ContinuousIntegrationBuild)' == 'true'">false</UseLocalRAIkeepSources>
 		<UseLocalRAIkeepSources Condition="'$(UseLocalRAIkeepSources)' == '' and '$(JsonPitProjectPath)' != '' and '$(OsLibProjectPath)' != ''">true</UseLocalRAIkeepSources>
 		<UseLocalRAIkeepSources Condition="'$(UseLocalRAIkeepSources)' == ''">false</UseLocalRAIkeepSources>
 		<JsonPitPackageVersion Condition="'$(JsonPitPackageVersion)' == ''">3.8.14</JsonPitPackageVersion>
