@@ -1,7 +1,18 @@
 # How to run next time:
 
 <code>cd /Users/rsb/Project2026/GitHub/RAIkeep
-release-chain.sh 3.9.0</code>
+scripts/release-chain.sh 3.9.1</code>
+
+The enforced package order is:
+
+- `OsLibCore`
+- `RaiUtils`
+- `RaiImage`
+- `JsonPit`
+- `ImgSeeder`
+- `PitSeeder`
+
+The chain keeps the 300-second wait between published packages and verifies package visibility through the NuGet flat-container `.nupkg` URL.
 
 ## About running inside the LLM:
 
