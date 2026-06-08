@@ -1,7 +1,7 @@
 # How to run next time:
 
 <code>cd /Users/rsb/Project2026/GitHub/RAIkeep
-scripts/release-chain.sh 3.9.1</code>
+scripts/release-chain.sh 3.10.0</code>
 
 The enforced package order is:
 
@@ -13,6 +13,8 @@ The enforced package order is:
 - `PitSeeder`
 
 The chain keeps the 300-second wait between published packages and verifies package visibility through the NuGet flat-container `.nupkg` URL.
+
+Do not run this as part of version-prep work unless publication is explicitly requested.
 
 ## About running inside the LLM:
 

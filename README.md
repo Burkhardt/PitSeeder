@@ -4,6 +4,12 @@ PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https:
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
+## 3.10.0
+
+- Coordinated minor release: aligns `PitSeeder` with `JsonPit 3.10.0` and `OsLibCore 3.10.0`.
+- Keeps `PitSeeder` last in the coordinated release order, immediately after `ImgSeeder`/`iorg`.
+- Current release notes: [RELEASE_NOTES_3.10.0.md](RELEASE_NOTES_3.10.0.md)
+
 ## Install
 
 After the package is published to NuGet:
@@ -211,7 +217,7 @@ Items in any pit can reference items in other pits using these section keywords.
 
 ## Build and Publish
 
-- Current release notes: [RELEASE_NOTES_3.9.1.md](RELEASE_NOTES_3.9.1.md)
+- Coordinated release order: `OsLibCore -> RaiUtils -> RaiImage -> JsonPit -> ImgSeeder -> PitSeeder`
 
 When a matching tag is pushed from the `RAIkeep` repository, the GitHub Actions workflow at `.github/workflows/publish-pitseeder-nuget.yml` now:
 
