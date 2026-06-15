@@ -1,7 +1,7 @@
 # How to run next time:
 
 <code>cd /Users/rsb/Project2026/GitHub/RAIkeep
-scripts/release-chain.sh 3.10.0</code>
+scripts/release-chain.sh 3.10.1</code>
 
 The enforced package order is:
 
