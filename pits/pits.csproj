@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<Title>PitSeeder</Title>
 		<Description>Command-line tool for seeding, exporting, and querying JsonPit data stores. Supports WWWA foreign key resolution, JSON export to file or stdout, and piping to jq.</Description>
-		<Version>3.10.1</Version>
+		<Version>3.10.2</Version>
 		<PackageId>PitSeeder</PackageId>
 		<Authors>Rainer Burkhardt</Authors>
 		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
