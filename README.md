@@ -4,11 +4,11 @@ PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https:
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
-## 3.10.2
+## 3.11.1
 
-- Coordinated patch release: aligns `PitSeeder` with `JsonPit 3.10.2` and `OsLibCore 3.10.2`.
+- Coordinated patch release: aligns `PitSeeder` with `JsonPit 3.11.1` and `OsLibCore 3.11.1`.
 - Keeps `PitSeeder` last in the coordinated release order, immediately after `ImgSeeder`/`iorg`.
-- Current release notes: [RELEASE_NOTES_3.10.2.md](RELEASE_NOTES_3.10.2.md)
+- Current release notes: [RELEASE_NOTES_3.11.1.md](RELEASE_NOTES_3.11.1.md)
 
 ## Install
 
