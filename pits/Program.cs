@@ -142,6 +142,7 @@ public static class Messages
 }
 internal static class Program
 {
+	private const string CliSubscriber = "pits";
 	private static int Main(string[] args)
 	{
 		try
@@ -373,7 +374,7 @@ internal static class Program
 	private static void SeedPit(TextFile source, PitFile pitFile)
 	{
 		Messages.WriteInfo($"Seeding pit from source file: {source.FullName} \n\tto destination: {pitFile.FullName}");
-		var pit = new Pit(pitFile, readOnly: false);
+		var pit = new Pit(pitFile, subscriber: CliSubscriber, readOnly: false);
 		Messages.WriteDebug($"{Icons.Info} Processing {pit.JsonFile.Name} Pit...");
 		var payload = source.ReadAllText();
 		var root = JToken.Parse(payload);
@@ -413,7 +414,7 @@ internal static class Program
 			return 1;
 		}
 		Messages.WriteInfo($"Exporting pit: {pitFile.FullName}");
-		var pit = new Pit(pitFile, readOnly: true);
+		var pit = new Pit(pitFile, subscriber: CliSubscriber, readOnly: true);
 		exportPath.mkdir();
 		pit.ExportJson(exportPath);
 		var exportFile = new RaiFile(exportPath, pit.JsonFile.Name, "json");
@@ -427,7 +428,7 @@ internal static class Program
 			Messages.WriteError($"Pit file '{pitFile.FullName}' does not exist.");
 			return 1;
 		}
-		var pit = new Pit(pitFile, readOnly: true);
+		var pit = new Pit(pitFile, subscriber: CliSubscriber, readOnly: true);
 		var items = new JArray();
 		foreach (var key in pit.Keys)
 		{
@@ -477,7 +478,7 @@ internal static class Program
 				Messages.WriteError($"Pit file '{pitFile.FullName}' does not exist.");
 				return null;
 			}
-			var pit = new Pit(pitFile, readOnly: true);
+			var pit = new Pit(pitFile, subscriber: CliSubscriber, readOnly: true);
 			pits[name] = pit;
 			var lookup = new Dictionary<string, JObject>(StringComparer.Ordinal);
 			foreach (var key in pit.Keys)

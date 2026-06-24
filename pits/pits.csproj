@@ -13,7 +13,7 @@
 		<RepositoryUrl>https://github.com/Burkhardt/RAIkeep.git</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
-		<PackageReleaseNotes>3.11.1: carries forward the coordinated package line, refreshes current CLI package metadata and dependency references, and makes no CLI behavior changes from 3.11.0.</PackageReleaseNotes>
+		<PackageReleaseNotes>3.11.1: aligns participant identity with JsonPit ticket ownership (Machine-pits), keeps coordinated dependency references at 3.11.1, and adds process-level local ticket-window regression coverage.</PackageReleaseNotes>
 		<OutputType>Exe</OutputType>
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
