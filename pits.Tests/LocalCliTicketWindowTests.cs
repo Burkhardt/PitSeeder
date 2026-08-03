@@ -12,13 +12,19 @@ public sealed class LocalCliTicketWindowTests : IDisposable
 	public LocalCliTicketWindowTests()
 	{
 		originalDuration = MasterFlagFile.TicketDuration;
-		root = new RaiPath(Path.GetTempPath()) / "RAIkeep" / "pitseeder-tests" / "local-cli-ticket-window" / Guid.NewGuid().ToString("N");
+		root = Os.TempDir / "RAIkeep" / "pitseeder-tests" / "local-cli-ticket-window";
+		Cleanup();
 		root.mkdir();
 	}
 
 	public void Dispose()
 	{
 		MasterFlagFile.TicketDuration = originalDuration;
+		Cleanup();
+	}
+
+	private void Cleanup()
+	{
 		try
 		{
 			if (root.Exists())
@@ -27,6 +33,54 @@ public sealed class LocalCliTicketWindowTests : IDisposable
 		catch
 		{
 		}
+	}
+
+	[Fact]
+	public void FiniteReadOnlyCli_ReleasesOwnProcessWindow_AndNextRunSucceeds()
+	{
+		MasterFlagFile.TicketDuration = TimeSpan.FromMinutes(5);
+		CreatePit("Person", "InitialPerson");
+
+		var firstRun = RunPits("-n", "-r", root.FullPath, "Person", "--json");
+		var secondRun = RunPits("-n", "-r", root.FullPath, "Person", "--json");
+
+		Assert.Equal(0, firstRun.exitCode);
+		Assert.Equal(0, secondRun.exitCode);
+		var flags = PitsProcessFlags(root / "Person");
+		Assert.NotEmpty(flags);
+		Assert.All(flags, flag => Assert.True(flag.IsExpired));
+	}
+
+	[Fact]
+	public void RetainWindowOption_KeepsFiniteCliWindowActive()
+	{
+		MasterFlagFile.TicketDuration = TimeSpan.FromMinutes(5);
+		CreatePit("Person", "RetainedPerson");
+
+		var run = RunPits("-n", "-r", root.FullPath, "Person", "--json", "--retain-window");
+
+		Assert.Equal(0, run.exitCode);
+		Assert.Contains(PitsProcessFlags(root / "Person"), flag => !flag.IsExpired);
+	}
+
+	[Fact]
+	public void CliException_ReleasesOwnedProcessWindow()
+	{
+		MasterFlagFile.TicketDuration = TimeSpan.FromMinutes(5);
+		CreatePit("Activity", "InitialActivity");
+		var invalidSource = new TextFile(root, "invalid-seed", "json5")
+		{
+			Lines = ["this is not valid json"],
+			Changed = true
+		};
+		invalidSource.Save();
+
+		var run = RunPits("-n", "-s", invalidSource.FullName, "-r", root.FullPath, "Activity");
+
+		Assert.Equal(1, run.exitCode);
+		var flags = PitsProcessFlags(root / "Activity");
+		Assert.Single(flags);
+		Assert.True(flags[0].IsExpired);
 	}
 
 	[Fact]
@@ -68,7 +122,7 @@ public sealed class LocalCliTicketWindowTests : IDisposable
 			.ToList();
 		Assert.Contains(changeFiles, file => file.Name.EndsWith("_" + apiIdentity, StringComparison.OrdinalIgnoreCase));
 
-		var canonicalBeforeMerge = File.ReadAllText(apiPit.JsonFile.FullName);
+		var canonicalBeforeMerge = new TextFile(apiPit.JsonFile.FullName).ReadAllText();
 		Assert.Contains("CliSeededActivity", canonicalBeforeMerge);
 		Assert.DoesNotContain("ApiShutdownFlushActivity", canonicalBeforeMerge);
 
@@ -76,7 +130,7 @@ public sealed class LocalCliTicketWindowTests : IDisposable
 		var secondRun = RunPits("-n", "-s", secondSeed, "-r", root.FullPath, "Activity");
 		Assert.Equal(0, secondRun.exitCode);
 
-		var canonicalAfterMerge = File.ReadAllText(apiPit.JsonFile.FullName);
+		var canonicalAfterMerge = new TextFile(apiPit.JsonFile.FullName).ReadAllText();
 		Assert.Contains("ApiInitialActivity", canonicalAfterMerge);
 		Assert.Contains("CliSeededActivity", canonicalAfterMerge);
 		Assert.Contains("ApiShutdownFlushActivity", canonicalAfterMerge);
@@ -85,8 +139,9 @@ public sealed class LocalCliTicketWindowTests : IDisposable
 
 	private string WriteSeed(string id, string phase)
 	{
-		var path = Path.Combine(root.FullPath, id + ".json5");
-		File.WriteAllText(path, $$"""
+		var source = new TextFile(root, id, "json5")
+		{
+			Lines = [$$"""
 		[
 		  {
 		    "Id": "{{id}}",
@@ -94,14 +149,31 @@ public sealed class LocalCliTicketWindowTests : IDisposable
 		    "Phase": "{{phase}}"
 		  }
 		]
-		""");
-		return path;
+		"""],
+			Changed = true
+		};
+		source.Save();
+		return source.FullName;
 	}
+
+	private void CreatePit(string name, string itemId)
+	{
+		var pit = new Pit(root / name, readOnly: false, autoload: false, unflagged: true);
+		var item = new PitItem(itemId);
+		item.SetProperty(new { Source = "test" });
+		pit.Add(item);
+		pit.Save(force: true);
+	}
+
+	private static List<MasterFlagFile> PitsProcessFlags(RaiPath pitPath) =>
+		pitPath.EnumerateFiles($"{Environment.MachineName}-pits-*.flag")
+			.Select(file => new MasterFlagFile(file.Path, file.Name))
+			.ToList();
 
 	private static (int exitCode, string output) RunPits(params string[] args)
 	{
-		var pitsDll = Path.Combine(AppContext.BaseDirectory, "pits.dll");
-		Assert.True(File.Exists(pitsDll), $"Expected pits.dll at {pitsDll}");
+		var pitsDll = new RaiFile(new RaiPath(AppContext.BaseDirectory), "pits", "dll");
+		Assert.True(pitsDll.Exists(), $"Expected pits.dll at {pitsDll.FullName}");
 
 		var startInfo = new ProcessStartInfo("dotnet")
 		{
@@ -109,7 +181,7 @@ public sealed class LocalCliTicketWindowTests : IDisposable
 			RedirectStandardError = true,
 			UseShellExecute = false
 		};
-		startInfo.ArgumentList.Add(pitsDll);
+		startInfo.ArgumentList.Add(pitsDll.FullName);
 		foreach (var arg in args)
 			startInfo.ArgumentList.Add(arg);
 

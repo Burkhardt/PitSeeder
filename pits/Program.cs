@@ -38,6 +38,7 @@ public static class Messages
 	public static bool Json { get; set; }
 	public static bool Wwwa { get; set; }
 	public static bool Banner { get; set; }
+	public static bool RetainWindow { get; set; }
 	public static string[] Help =>
 	[
 		$"-h, --help\t{Icons.Help}\tprint out all options",
@@ -50,6 +51,7 @@ public static class Messages
 		$"-e, --export\t{Icons.Download}\t{ExportDescription()}",
 		$"--json\t\t{(Json ? Icons.Success : Icons.NotAvailable)}\texport to stdout (for piping to jq, grep, etc.)",
 		$"--wwwa\t\t{(Wwwa ? Icons.Success : Icons.NotAvailable)}\toperate on all 4 pits (Person, Object, Place, Activity)",
+		$"--retain-window\t{Icons.Info}\tkeep this CLI process activity window until its normal timeout",
 		$"{Icons.Info} PitName\t{Icons.File}\t{PitNameDescription()}",
 		$"\t\t{Icons.Info}\tpositional arg: pit to operate on, or target pit name when used with -s",
 		$"\t\t{Icons.Info}\te.g. 'pits -s patch.json5 -r <root> Activity' seeds Activity.pit from patch.json5",
@@ -143,6 +145,13 @@ public static class Messages
 internal static class Program
 {
 	private const string CliSubscriber = "pits";
+	private static readonly object ActivePitsLock = new();
+	private static readonly HashSet<Pit> ActivePits = [];
+	static Program()
+	{
+		Console.CancelKeyPress += (_, _) => ReleaseAllProcessWindows();
+		AppDomain.CurrentDomain.ProcessExit += (_, _) => ReleaseAllProcessWindows();
+	}
 	private static int Main(string[] args)
 	{
 		try
@@ -158,6 +167,7 @@ internal static class Program
 			bool showHelp = HasOption(args, "-h", "--help");
 			bool wwwa = Messages.Wwwa = HasOption(args, "-wwwa", "--wwwa");
 			bool json = Messages.Json = HasOption(args, "--json");
+			Messages.RetainWindow = HasOption(args, "--retain-window");
 			string? cloudProvider = Messages.CloudProvider = ParamValue(args, "-c", "--cloudprovider", "--cloud");
 			var pitRootParam = ParamValue(args, "-r", "--pitroot");
 			var sourceParam = Messages.Source = ParamValue(args, "-s", "--source");
@@ -374,21 +384,28 @@ internal static class Program
 	private static void SeedPit(TextFile source, PitFile pitFile)
 	{
 		Messages.WriteInfo($"Seeding pit from source file: {source.FullName} \n\tto destination: {pitFile.FullName}");
-		var pit = new Pit(pitFile, subscriber: CliSubscriber, readOnly: false);
-		Messages.WriteDebug($"{Icons.Info} Processing {pit.JsonFile.Name} Pit...");
-		var payload = source.ReadAllText();
-		var root = JToken.Parse(payload);
-		JArray itemsArray = root switch
+		var pit = TrackPit(new Pit(pitFile, subscriber: CliSubscriber, readOnly: false));
+		try
 		{
-			JArray arr => arr,
-			// Keyed object map: { "Id1": { ... }, "Id2": { ... } } → take the values
-			JObject obj => new JArray(obj.Properties().Select(p => p.Value)),
-			_ => throw new ArgumentException(
-				$"Source '{source.FullName}' must be a JSON array or keyed object map; got {root.Type}.")
-		};
-		pit.AddItems(itemsArray.ToString());
-		pit.Save();
-		Messages.WriteSuccess($"{Icons.Success} Initialized and saved {pit.JsonFile.Name} to {pit.JsonFile.FullName}");
+			Messages.WriteDebug($"{Icons.Info} Processing {pit.JsonFile.Name} Pit...");
+			var payload = source.ReadAllText();
+			var root = JToken.Parse(payload);
+			JArray itemsArray = root switch
+			{
+				JArray arr => arr,
+				// Keyed object map: { "Id1": { ... }, "Id2": { ... } } → take the values
+				JObject obj => new JArray(obj.Properties().Select(p => p.Value)),
+				_ => throw new ArgumentException(
+					$"Source '{source.FullName}' must be a JSON array or keyed object map; got {root.Type}.")
+			};
+			pit.AddItems(itemsArray.ToString());
+			pit.Save();
+			Messages.WriteSuccess($"{Icons.Success} Initialized and saved {pit.JsonFile.Name} to {pit.JsonFile.FullName}");
+		}
+		finally
+		{
+			ReleaseProcessWindow(pit);
+		}
 	}
 	private static int RunBulkSeed(RaiPath sourceDir, RaiPath pitRoot)
 	{
@@ -414,12 +431,19 @@ internal static class Program
 			return 1;
 		}
 		Messages.WriteInfo($"Exporting pit: {pitFile.FullName}");
-		var pit = new Pit(pitFile, subscriber: CliSubscriber, readOnly: true);
-		exportPath.mkdir();
-		pit.ExportJson(exportPath);
-		var exportFile = new RaiFile(exportPath, pit.JsonFile.Name, "json");
-		Messages.WriteSuccess($"{Icons.Success} Exported {pit.JsonFile.Name} to {exportFile.FullName}");
-		return 0;
+		var pit = TrackPit(new Pit(pitFile, subscriber: CliSubscriber, readOnly: true));
+		try
+		{
+			exportPath.mkdir();
+			pit.ExportJson(exportPath);
+			var exportFile = new RaiFile(exportPath, pit.JsonFile.Name, "json");
+			Messages.WriteSuccess($"{Icons.Success} Exported {pit.JsonFile.Name} to {exportFile.FullName}");
+			return 0;
+		}
+		finally
+		{
+			ReleaseProcessWindow(pit);
+		}
 	}
 	private static int ExportPitToStdout(PitFile pitFile)
 	{
@@ -428,15 +452,22 @@ internal static class Program
 			Messages.WriteError($"Pit file '{pitFile.FullName}' does not exist.");
 			return 1;
 		}
-		var pit = new Pit(pitFile, subscriber: CliSubscriber, readOnly: true);
-		var items = new JArray();
-		foreach (var key in pit.Keys)
+		var pit = TrackPit(new Pit(pitFile, subscriber: CliSubscriber, readOnly: true));
+		try
 		{
-			var item = pit[key];
-			if (item is not null) items.Add(item);
+			var items = new JArray();
+			foreach (var key in pit.Keys)
+			{
+				var item = pit[key];
+				if (item is not null) items.Add(item);
+			}
+			Console.WriteLine(items.ToString(Formatting.Indented));
+			return 0;
 		}
-		Console.WriteLine(items.ToString(Formatting.Indented));
-		return 0;
+		finally
+		{
+			ReleaseProcessWindow(pit);
+		}
 	}
 	private static int ExportWwwa(RaiPath pitRoot, RaiPath exportPath)
 	{
@@ -467,44 +498,89 @@ internal static class Program
 	/// </summary>
 	private static JObject? BuildResolvedWwwa(RaiPath pitRoot)
 	{
-		// Load all 4 pits and build lookup dictionaries
 		var pits = new Dictionary<string, Pit>();
-		var lookups = new Dictionary<string, Dictionary<string, JObject>>();
-		foreach (var name in Messages.WwwaFiles)
+		try
 		{
-			var pitFile = new PitFile(pitRoot / name, name);
-			if (!pitFile.Exists())
+			// Load all 4 pits and build lookup dictionaries
+			var lookups = new Dictionary<string, Dictionary<string, JObject>>();
+			foreach (var name in Messages.WwwaFiles)
 			{
-				Messages.WriteError($"Pit file '{pitFile.FullName}' does not exist.");
-				return null;
+				var pitFile = new PitFile(pitRoot / name, name);
+				if (!pitFile.Exists())
+				{
+					Messages.WriteError($"Pit file '{pitFile.FullName}' does not exist.");
+					return null;
+				}
+				var pit = TrackPit(new Pit(pitFile, subscriber: CliSubscriber, readOnly: true));
+				pits[name] = pit;
+				var lookup = new Dictionary<string, JObject>(StringComparer.Ordinal);
+				foreach (var key in pit.Keys)
+				{
+					var item = pit[key];
+					if (item is JObject obj)
+						lookup[key] = obj;
+				}
+				lookups[name] = lookup;
 			}
-			var pit = new Pit(pitFile, subscriber: CliSubscriber, readOnly: true);
-			pits[name] = pit;
-			var lookup = new Dictionary<string, JObject>(StringComparer.Ordinal);
-			foreach (var key in pit.Keys)
+			// Export each pit with resolved references
+			var result = new JObject();
+			foreach (var name in Messages.WwwaFiles)
 			{
-				var item = pit[key];
-				if (item is JObject obj)
-					lookup[key] = obj;
+				var items = new JArray();
+				foreach (var key in pits[name].Keys)
+				{
+					var item = pits[name][key];
+					if (item is JObject obj)
+						items.Add(ResolveWwwaReferences(obj, lookups));
+					else if (item is not null)
+						items.Add(item);
+				}
+				result[name] = items;
 			}
-			lookups[name] = lookup;
+			return result;
 		}
-		// Export each pit with resolved references
-		var result = new JObject();
-		foreach (var name in Messages.WwwaFiles)
+		finally
 		{
-			var items = new JArray();
-			foreach (var key in pits[name].Keys)
-			{
-				var item = pits[name][key];
-				if (item is JObject obj)
-					items.Add(ResolveWwwaReferences(obj, lookups));
-				else if (item is not null)
-					items.Add(item);
-			}
-			result[name] = items;
+			foreach (var pit in pits.Values)
+				ReleaseProcessWindow(pit);
 		}
-		return result;
+	}
+	private static void ReleaseProcessWindow(Pit pit)
+	{
+		if (Messages.RetainWindow)
+		{
+			lock (ActivePitsLock)
+				ActivePits.Remove(pit);
+			return;
+		}
+		try
+		{
+			if (pit.TryReleaseProcessWindow())
+				Messages.WriteDebug($"Released process activity window for {pit.JsonFile.Name}.");
+			lock (ActivePitsLock)
+				ActivePits.Remove(pit);
+		}
+		catch (Exception ex)
+		{
+			Messages.WriteDebug($"Could not release the process activity window for {pit.JsonFile.Name}; process-exit cleanup will retry: {ex.Message}");
+		}
+	}
+	private static Pit TrackPit(Pit pit)
+	{
+		lock (ActivePitsLock)
+			ActivePits.Add(pit);
+		return pit;
+	}
+	private static void ReleaseAllProcessWindows()
+	{
+		Pit[] active;
+		lock (ActivePitsLock)
+			active = ActivePits.ToArray();
+		foreach (var pit in active)
+		{
+			try { ReleaseProcessWindow(pit); }
+			catch { }
+		}
 	}
 	/// <summary>
 	/// Resolves one level of WWWA foreign key references in a pit item.
