@@ -1,14 +1,16 @@
 # PitSeeder
 
+PitSeeder change requests and release notes are centralized in the RAIkeep [`doc/`](https://github.com/Burkhardt/RAIkeep/tree/main/doc) directory under `PitSeeder_...` filenames; they are not stored separately in this child repository.
+
 PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https://github.com/Burkhardt/RAIkeep) data stores. It can seed pits from JSON/JSON5 source files, export pits to JSON, and produce resolved WWWA exports where foreign key references are expanded inline.
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
-## 3.13.0
+## 3.13.1
 
-- Coordinated minor release: aligns `PitSeeder` with `JsonPit 3.13.0` and `OsLibCore 3.13.0`.
+- Coordinated patch release: aligns `PitSeeder` with `JsonPit 3.13.1` and `OsLibCore 3.13.1`.
 - Keeps `PitSeeder` last in the coordinated release order, immediately after `ImgSeeder`/`iorg`.
-- Current release notes: [RELEASE_NOTES_3.13.0.md](RELEASE_NOTES_3.13.0.md)
+- Current release notes: [PitSeeder_RELEASE_NOTES_3.13.1.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_3.13.1.md)
 
 ## Install
 
@@ -48,7 +50,16 @@ pits [options] [<pit name>]
 | `-e`, `--export` | Export directory for JSON output |
 | `--json` | Export to stdout (for piping to `jq`, `grep`, etc.) |
 | `--wwwa` | Operate on all 4 WWWA pits (Person, Object, Place, Activity) |
+| `--retain-window` | Keep this CLI process activity window until the normal timeout instead of releasing it on exit |
 | `<pit name>` | Positional argument: the pit to operate on (e.g., `Person`) |
+
+## Process-window lifecycle
+
+Finite `pits` commands release their process activity windows by default after normal completion and when execution unwinds through an exception. Ctrl+C and process exit also attempt ownership-verified cleanup. Use `--retain-window` only when the prior timeout-based activity behavior is explicitly required.
+
+Each invocation uses `{MachineName}-pits-{PID}.flag`. Release succeeds only while the flag content still identifies that OS process, and writes an expired epoch timestamp in place rather than deleting/recreating the OneDrive-backed file. Another process's activity flag cannot be released.
+
+The process activity window is not the master writer ticket. A completed seed command retains its timed master ticket so stale API writers continue to fall back to change files; this preserves the existing overlapping-writer safety contract.
 
 ## Features
 
