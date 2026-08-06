@@ -88,53 +88,65 @@ public sealed class LocalCliTicketWindowTests : IDisposable
 	{
 		MasterFlagFile.TicketDuration = TimeSpan.FromMinutes(5);
 		var activityPath = root / "Activity";
-		var apiIdentity = ProcessFlagFile.FlagName("AfricaStage.Api");
-		var pitsIdentity = ProcessFlagFile.FlagName("pits");
+		// v3.13.2 (CR003): master ownership records the exact process identity.
+		var apiExactIdentity = ProcessFlagFile.CurrentFlagName("AfricaStage.Api");
+		var cliParticipantPrefix = $"{Environment.MachineName}-pits-";
 
 		var apiPit = new Pit(activityPath, readOnly: false, autoload: false, subscriber: "AfricaStage.Api");
-		var initialItem = new PitItem("ApiInitialActivity");
-		initialItem.SetProperty(new { Source = "AfricaStage.Api", Phase = "Startup" });
-		apiPit.Add(initialItem);
-		apiPit.Save(force: true);
+		try
+		{
+			var initialItem = new PitItem("ApiInitialActivity");
+			initialItem.SetProperty(new { Source = "AfricaStage.Api", Phase = "Startup" });
+			apiPit.Add(initialItem);
+			apiPit.Save(force: true);
 
-		Assert.Equal(apiIdentity, apiPit.MasterFlag().Originator);
+			Assert.Equal(apiExactIdentity, apiPit.MasterFlag().Originator);
 
-		var expiredTicketTime = DateTimeOffset.UtcNow - MasterFlagFile.TicketDuration - TimeSpan.FromSeconds(10);
-		apiPit.MasterFlag().Update(expiredTicketTime, originator: apiIdentity);
-		Assert.True(apiPit.MasterFlag().IsExpired);
+			var expiredTicketTime = DateTimeOffset.UtcNow - MasterFlagFile.TicketDuration - TimeSpan.FromSeconds(10);
+			apiPit.MasterFlag().Update(expiredTicketTime, originator: apiExactIdentity);
+			Assert.True(apiPit.MasterFlag().IsExpired);
 
-		var firstSeed = WriteSeed("CliSeededActivity", "Seed");
-		var firstRun = RunPits("-n", "-s", firstSeed, "-r", root.FullPath, "Activity");
-		Assert.Equal(0, firstRun.exitCode);
+			// A REAL separate CLI process claims the expired lease with its exact PID.
+			var firstSeed = WriteSeed("CliSeededActivity", "Seed");
+			var firstRun = RunPits("-n", "-s", firstSeed, "-r", root.FullPath, "Activity");
+			Assert.Equal(0, firstRun.exitCode);
 
-		var masterAfterCli = new MasterFlagFile(activityPath, "Master");
-		Assert.Equal(pitsIdentity, masterAfterCli.Originator);
-		Assert.False(masterAfterCli.IsExpired);
+			var masterAfterCli = new MasterFlagFile(activityPath, "Master");
+			Assert.StartsWith(cliParticipantPrefix, masterAfterCli.Originator);
+			Assert.False(masterAfterCli.IsExpired);
 
-		var shutdownItem = new PitItem("ApiShutdownFlushActivity");
-		shutdownItem.SetProperty(new { Source = "AfricaStage.Api", Phase = "Shutdown" });
-		apiPit.Add(shutdownItem);
-		apiPit.Save();
+			var shutdownItem = new PitItem("ApiShutdownFlushActivity");
+			shutdownItem.SetProperty(new { Source = "AfricaStage.Api", Phase = "Shutdown" });
+			apiPit.Add(shutdownItem);
+			apiPit.Save();
 
-		Assert.Equal(pitsIdentity, apiPit.MasterFlag().Originator);
-		var changeFiles = apiPit.PitDir.EnumerateFiles("*.json")
-			.Where(f => f.Name != apiPit.JsonFile.Name)
-			.ToList();
-		Assert.Contains(changeFiles, file => file.Name.EndsWith("_" + apiIdentity, StringComparison.OrdinalIgnoreCase));
+			// The API process must not inherit the CLI's valid lease: change files only.
+			Assert.StartsWith(cliParticipantPrefix, apiPit.MasterFlag().Originator);
+			var changeFiles = apiPit.PitDir.EnumerateFiles("*.json")
+				.Where(f => f.Name != apiPit.JsonFile.Name)
+				.ToList();
+			Assert.Contains(changeFiles, file => ChangeFile.IdentityOf(file.Name) == apiExactIdentity);
 
-		var canonicalBeforeMerge = new TextFile(apiPit.JsonFile.FullName).ReadAllText();
-		Assert.Contains("CliSeededActivity", canonicalBeforeMerge);
-		Assert.DoesNotContain("ApiShutdownFlushActivity", canonicalBeforeMerge);
+			var canonicalBeforeMerge = new TextFile(apiPit.JsonFile.FullName).ReadAllText();
+			Assert.Contains("CliSeededActivity", canonicalBeforeMerge);
+			Assert.DoesNotContain("ApiShutdownFlushActivity", canonicalBeforeMerge);
 
-		var secondSeed = WriteSeed("CliMergeTriggerActivity", "MergeTrigger");
-		var secondRun = RunPits("-n", "-s", secondSeed, "-r", root.FullPath, "Activity");
-		Assert.Equal(0, secondRun.exitCode);
+			// A second CLI process (new PID, same stable participant) inherits the lease —
+			// the previous CLI released its window on disposal — and folds the changes in.
+			var secondSeed = WriteSeed("CliMergeTriggerActivity", "MergeTrigger");
+			var secondRun = RunPits("-n", "-s", secondSeed, "-r", root.FullPath, "Activity");
+			Assert.Equal(0, secondRun.exitCode);
 
-		var canonicalAfterMerge = new TextFile(apiPit.JsonFile.FullName).ReadAllText();
-		Assert.Contains("ApiInitialActivity", canonicalAfterMerge);
-		Assert.Contains("CliSeededActivity", canonicalAfterMerge);
-		Assert.Contains("ApiShutdownFlushActivity", canonicalAfterMerge);
-		Assert.Contains("CliMergeTriggerActivity", canonicalAfterMerge);
+			var canonicalAfterMerge = new TextFile(apiPit.JsonFile.FullName).ReadAllText();
+			Assert.Contains("ApiInitialActivity", canonicalAfterMerge);
+			Assert.Contains("CliSeededActivity", canonicalAfterMerge);
+			Assert.Contains("ApiShutdownFlushActivity", canonicalAfterMerge);
+			Assert.Contains("CliMergeTriggerActivity", canonicalAfterMerge);
+		}
+		finally
+		{
+			apiPit.Dispose();
+		}
 	}
 
 	private string WriteSeed(string id, string phase)
@@ -158,7 +170,8 @@ public sealed class LocalCliTicketWindowTests : IDisposable
 
 	private void CreatePit(string name, string itemId)
 	{
-		var pit = new Pit(root / name, readOnly: false, autoload: false, unflagged: true);
+		// Dispose releases the process-wide canonical-path ownership (CR003 §4).
+		using var pit = new Pit(root / name, readOnly: false, autoload: false, unflagged: true);
 		var item = new PitItem(itemId);
 		item.SetProperty(new { Source = "test" });
 		pit.Add(item);

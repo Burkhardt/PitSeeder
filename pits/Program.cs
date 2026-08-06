@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using System.Linq;
 using JsonPit;
+using Microsoft.Extensions.Logging;
 using OsLib;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -39,6 +40,7 @@ public static class Messages
 	public static bool Wwwa { get; set; }
 	public static bool Banner { get; set; }
 	public static bool RetainWindow { get; set; }
+	public static bool Events { get; set; }
 	public static string[] Help =>
 	[
 		$"-h, --help\t{Icons.Help}\tprint out all options",
@@ -52,6 +54,9 @@ public static class Messages
 		$"--json\t\t{(Json ? Icons.Success : Icons.NotAvailable)}\texport to stdout (for piping to jq, grep, etc.)",
 		$"--wwwa\t\t{(Wwwa ? Icons.Success : Icons.NotAvailable)}\toperate on all 4 pits (Person, Object, Place, Activity)",
 		$"--retain-window\t{Icons.Info}\tkeep this CLI process activity window until its normal timeout",
+		$"--events\t{(Events ? Icons.Success : Icons.NotAvailable)}\tread-only audit of a pit's durable events (no Pit, flags, or new events)",
+		$"--event-machine\t{Icons.Info}\tall|local|<machine> filter for --events (default: all)",
+		$"--event-level\t{Icons.Info}\tinclusive minimum severity for --events (default: Trace)",
 		$"{Icons.Info} PitName\t{Icons.File}\t{PitNameDescription()}",
 		$"\t\t{Icons.Info}\tpositional arg: pit to operate on, or target pit name when used with -s",
 		$"\t\t{Icons.Info}\te.g. 'pits -s patch.json5 -r <root> Activity' seeds Activity.pit from patch.json5",
@@ -168,6 +173,9 @@ internal static class Program
 			bool wwwa = Messages.Wwwa = HasOption(args, "-wwwa", "--wwwa");
 			bool json = Messages.Json = HasOption(args, "--json");
 			Messages.RetainWindow = HasOption(args, "--retain-window");
+			bool events = Messages.Events = HasOption(args, "--events");
+			string? eventMachine = ParamValue(args, "--event-machine");
+			string? eventLevel = ParamValue(args, "--event-level");
 			string? cloudProvider = Messages.CloudProvider = ParamValue(args, "-c", "--cloudprovider", "--cloud");
 			var pitRootParam = ParamValue(args, "-r", "--pitroot");
 			var sourceParam = Messages.Source = ParamValue(args, "-s", "--source");
@@ -204,6 +212,33 @@ internal static class Program
 			#endregion
 			#region VALIDATE & SETUP
 			bool hasExecutionIntent = false;
+			// Audit mode routes before any Pit construction (CR003): it must not open a Pit,
+			// create a process flag, acquire master authority, or write an audit event.
+			if (events)
+			{
+				if (wwwa)
+				{
+					Messages.WriteError("--wwwa cannot be combined with --events; audit mode requires one positional pit name.");
+					return 1;
+				}
+				if (string.IsNullOrWhiteSpace(pitName))
+				{
+					Messages.WriteError("--events requires one positional pit name, e.g. 'pits -r <root> Person --events'.");
+					return 1;
+				}
+				if (pitRoot == null)
+				{
+					Messages.WriteError($"Cannot resolve pit '{pitName}' without -r or --pitroot.");
+					return 1;
+				}
+				var minLevel = LogLevel.Trace;
+				if (!string.IsNullOrWhiteSpace(eventLevel) && !PitAudit.TryParseLevel(eventLevel, out minLevel))
+				{
+					Messages.WriteError($"Invalid --event-level '{eventLevel}'. Valid values: Trace, Debug, Information, Warning, Error, Critical.");
+					return 1;
+				}
+				return ShowEvents(pitRoot / pitName, eventMachine ?? "all", minLevel, json);
+			}
 			// WWWA seed mode: -s sourceDir --wwwa -r pitroot
 			if (wwwa && !string.IsNullOrWhiteSpace(sourceParam) && !sourceParam.EndsWith(".pit", StringComparison.OrdinalIgnoreCase))
 			{
@@ -341,7 +376,7 @@ internal static class Program
 		return 1;
 	}
 	#region Helpers for argument parsing
-	private static readonly string[] SwitchesWithValues = { "-s", "--source", "-r", "--pitroot", "-e", "--export", "-c", "--cloudprovider", "--cloud" };
+	private static readonly string[] SwitchesWithValues = { "-s", "--source", "-r", "--pitroot", "-e", "--export", "-c", "--cloudprovider", "--cloud", "--event-machine", "--event-level" };
 	private static string? ParamValue(string[] options, params string[] aliases)
 		=> aliases.Select(a => Array.IndexOf(options, a)).Where(i => i >= 0)
 			.Select(i => i + 1 < options.Length && !options[i + 1].StartsWith("-")
@@ -378,6 +413,32 @@ internal static class Program
 			?? assembly?.GetName().Version?.ToString()
 			?? "unknown";
 		return $"{name} v{version}";
+	}
+	#endregion
+	#region Events audit mode
+	/// <summary>
+	/// Read-only audit of a pit's durable events (CR003): reads EventDirectory content via
+	/// JsonPit's PitAudit without opening a Pit, creating a process flag, acquiring master
+	/// authority, or writing an audit event. Output is deterministic: ordered by machine,
+	/// UTC time, and event identity.
+	/// </summary>
+	private static int ShowEvents(RaiPath pitDirectory, string machineFilter, LogLevel minLevel, bool json)
+	{
+		var events = PitAudit.Read(pitDirectory, machineFilter, minLevel);
+		if (json)
+		{
+			var array = new JArray(events.Select(e => e.Content));
+			Console.WriteLine(array.ToString(Formatting.Indented));
+			return 0;
+		}
+		if (events.Count == 0)
+		{
+			Messages.WriteInfo($"No matching events under {pitDirectory.FullPath}{OsLib.EventDirectory.Name}.");
+			return 0;
+		}
+		foreach (var e in events)
+			Console.WriteLine($"{e.Machine}\t{e.UtcTime:o}\t{e.Level}\t{e.Stage}\t{e.Message}\t({e.FileName})");
+		return 0;
 	}
 	#endregion
 	#region Seeding Methods
@@ -549,14 +610,19 @@ internal static class Program
 	{
 		if (Messages.RetainWindow)
 		{
+			// Opt-out: keep the activity window until its normal timeout. Accepted data is
+			// already durable through Save(); the full disposal sequence would release it.
 			lock (ActivePitsLock)
 				ActivePits.Remove(pit);
 			return;
 		}
 		try
 		{
-			if (pit.TryReleaseProcessWindow())
-				Messages.WriteDebug($"Released process activity window for {pit.JsonFile.Name}.");
+			// CR003 durability boundary: Dispose publishes the tenure write set plus dirty
+			// fragments as ordinary change files, optionally completes a canonical save,
+			// then releases the process window, watcher, and path registration.
+			pit.Dispose();
+			Messages.WriteDebug($"Disposed pit {pit.JsonFile.Name} and released its process activity window.");
 			lock (ActivePitsLock)
 				ActivePits.Remove(pit);
 		}

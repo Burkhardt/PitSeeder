@@ -53,11 +53,29 @@ pits [options] [<pit name>]
 | `--json` | Export to stdout (for piping to `jq`, `grep`, etc.) |
 | `--wwwa` | Operate on all 4 WWWA pits (Person, Object, Place, Activity) |
 | `--retain-window` | Keep this CLI process activity window until the normal timeout instead of releasing it on exit |
+| `--events` | Read-only audit of a pit's durable JsonPit recovery events (requires one positional pit name) |
+| `--event-machine` | `all` \| `local` \| `<machine>` filter for `--events` (default: `all`) |
+| `--event-level` | Case-insensitive inclusive minimum severity for `--events`: `Trace`, `Debug`, `Information`, `Warning`, `Error`, `Critical` (default: `Trace`) |
 | `<pit name>` | Positional argument: the pit to operate on (e.g., `Person`) |
+
+## Events audit mode
+
+`pits -r <root> <PitName> --events` reads the pit's durable recovery events from its
+`Events` child directory. It is strictly read-only: it opens no `Pit`, creates no
+process or master flag, merges nothing, and writes no audit event. With `--json` it
+emits the filtered events as a JSON array; otherwise output is human-readable and
+ordered deterministically by machine, UTC time, and event identity.
+
+```zsh
+pits -n -r /path/to/pitroot/ Person --events --event-level warning
+pits -n -r /path/to/pitroot/ Person --events --json | jq '.[].Stage'
+```
+
+`--wwwa` cannot be combined with `--events`.
 
 ## Process-window lifecycle
 
-Finite `pits` commands release their process activity windows by default after normal completion and when execution unwinds through an exception. Ctrl+C and process exit also attempt ownership-verified cleanup. Use `--retain-window` only when the prior timeout-based activity behavior is explicitly required.
+Finite `pits` commands dispose their pits through JsonPit's durability boundary by default after normal completion and when execution unwinds through an exception: accepted fragments are exported as collision-safe change files before the process activity window is released. Ctrl+C and process exit also attempt this cleanup. Use `--retain-window` only when the prior timeout-based activity behavior is explicitly required.
 
 Each invocation uses `{MachineName}-pits-{PID}.flag`. Release succeeds only while the flag content still identifies that OS process, and writes an expired epoch timestamp in place rather than deleting/recreating the OneDrive-backed file. Another process's activity flag cannot be released.
 
