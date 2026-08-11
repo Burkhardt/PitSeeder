@@ -19,6 +19,8 @@ public static class Icons
 	public const char Upload = '\ueac3';
 	public const char Banner = '\ueb1e';
 	public const char NoBanner = '\ueb24';
+	public static readonly string[] NumberCircles = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"];
+	public static readonly string[] FilledNumberCircles = ["❶", "❷", "❸", "❹", "❺", "❻", "❼", "❽", "❾"];
 }
 public static class Messages
 {
@@ -43,24 +45,25 @@ public static class Messages
 	public static bool Events { get; set; }
 	public static string[] Help =>
 	[
+		$"Commands:\t{Icons.Info}\tseed, export, audit (preferred 4.x syntax)",
+		$"  pits seed <PitName> --source <file>",
+		$"  pits export (<PitName> | --wwwa) (--out-dir <dir> | --json)",
+		$"  pits audit <PitName> [--machine <all|local|name>] [--level <severity>] [--json]",
 		$"-h, --help\t{Icons.Help}\tprint out all options",
 		$"-v, --version\t{Icons.Info}\tprint version info",
 		$"-n, --nologo\t{(Banner ? Icons.Banner : Icons.NoBanner)}\tdo not display the banner",
 		$"-b, --debug\t{Icons.Info}\tenable debug output",
 		$"-r, --pitroot\t{Icons.Folder}\t{PitRootDescription()}",
-		$"-c, --cloud\t{Icons.Folder}\t{CloudDescription()}",
+		$"-c, --cloud\t{CloudIcon()}\t{CloudDescription()}",
 		$"-s, --source\t{Icons.File}\t{SourceDescription()}",
 		$"-e, --export\t{Icons.Download}\t{ExportDescription()}",
 		$"--json\t\t{(Json ? Icons.Success : Icons.NotAvailable)}\texport to stdout (for piping to jq, grep, etc.)",
 		$"--wwwa\t\t{(Wwwa ? Icons.Success : Icons.NotAvailable)}\toperate on all 4 pits (Person, Object, Place, Activity)",
 		$"--retain-window\t{Icons.Info}\tkeep this CLI process activity window until its normal timeout",
-		$"--events\t{(Events ? Icons.Success : Icons.NotAvailable)}\tread-only audit of a pit's durable events (no Pit, flags, or new events)",
-		$"--event-machine\t{Icons.Info}\tall|local|<machine> filter for --events (default: all)",
-		$"--event-level\t{Icons.Info}\tinclusive minimum severity for --events (default: Trace)",
+		$"{Icons.Warning} Legacy\t{Icons.Info}\tflat seed/export flags remain supported in 4.x; use command syntax before 5.x",
 		$"{Icons.Info} PitName\t{Icons.File}\t{PitNameDescription()}",
 		$"\t\t{Icons.Info}\tpositional arg: pit to operate on, or target pit name when used with -s",
 		$"\t\t{Icons.Info}\te.g. 'pits -s patch.json5 -r <root> Activity' seeds Activity.pit from patch.json5",
-		$"{Icons.Info} PitRoot\t{PitRootStatusLine()}",
 		$"{Icons.Info} Person\t{WwwaPitStatus("Person")}",
 		$"{Icons.Info} Object\t{WwwaPitStatus("Object")}",
 		$"{Icons.Info} Place\t\t{WwwaPitStatus("Place")}",
@@ -74,12 +77,71 @@ public static class Messages
 	}
 	private static string CloudDescription()
 	{
-		if (!string.IsNullOrWhiteSpace(CloudProvider))
+		var options = CloudProviderOptions();
+		return options.Length > 0
+			? string.Join(", ", options.Select((name, index) =>
+				$"{NumberIcon(index + 1)} {name}{(index == 0 ? " (default)" : string.Empty)}"))
+			: "no DefaultCloudOrder providers are configured";
+	}
+	private static string CloudIcon()
+	{
+		var options = CloudProviderOptions();
+		var index = Array.FindIndex(options, option =>
+			string.Equals(option, CloudProvider, StringComparison.OrdinalIgnoreCase));
+		return index >= 0 ? SelectedNumberIcon(index + 1) : Icons.Folder.ToString();
+	}
+	private static string NumberIcon(int number) => number switch
+	{
+		> 0 when number <= Icons.NumberCircles.Length => Icons.NumberCircles[number - 1],
+		_ => $"({number})"
+	};
+	private static string SelectedNumberIcon(int number) => number switch
+	{
+		> 0 when number <= Icons.FilledNumberCircles.Length => Icons.FilledNumberCircles[number - 1],
+		_ => $"({number})"
+	};
+	internal static string[] CloudProviderOptions()
+	{
+		var defaultCloudOrder = new List<string>();
+		var configuredCloudProviders = new List<string>();
+		try
 		{
-			var cloudDir = Os.Config?.Cloud?[CloudProvider];
-			return $"{CloudProvider}: {cloudDir ?? "(not configured)"}";
+			dynamic? order = Os.Config?.DefaultCloudOrder;
+			if (order != null)
+			{
+				foreach (var item in order)
+				{
+					string? name = item?.ToString();
+					if (!string.IsNullOrWhiteSpace(name))
+						defaultCloudOrder.Add(name);
+				}
+			}
+
+			dynamic? cloud = Os.Config?.Cloud;
+			if (cloud != null)
+			{
+				IEnumerable<dynamic> properties = cloud.Properties();
+				configuredCloudProviders.AddRange(properties
+					.Where(property => !string.IsNullOrWhiteSpace(property.Value?.ToString()))
+					.Select(property => (string)property.Name));
+			}
 		}
-		return "cloud provider name (looks up root in Os.Config)";
+		catch
+		{
+			return [];
+		}
+
+		return FilterConfiguredDefaultCloudProviders(defaultCloudOrder, configuredCloudProviders);
+	}
+	internal static string[] FilterConfiguredDefaultCloudProviders(
+		IEnumerable<string> defaultCloudOrder,
+		IEnumerable<string> configuredCloudProviders)
+	{
+		var configured = configuredCloudProviders.ToHashSet(StringComparer.OrdinalIgnoreCase);
+		return defaultCloudOrder
+			.Where(name => !string.IsNullOrWhiteSpace(name) && configured.Contains(name))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToArray();
 	}
 	private static string SourceDescription()
 	{
@@ -103,13 +165,6 @@ public static class Messages
 			? PitName
 			: "pit to operate on or seed target (e.g., Activity)";
 	}
-	private static string PitRootStatusLine()
-	{
-		if (PitRoot == null)
-			return $"{Icons.NotAvailable}\t(not set)";
-		var exists = PitRoot.Exists();
-		return $"{(exists ? Icons.Success : Icons.NotAvailable)}\t{PitRoot.FullPath}";
-	}
 	private static string WwwaPitStatus(string name)
 	{
 		if (PitRoot == null)
@@ -131,15 +186,17 @@ public static class Messages
 	public static void WriteSuccess(string text) => WriteHighlighted(text, ConsoleColor.DarkGreen);
 	public static void WriteInfo(string text) => WriteHighlighted(text, ConsoleColor.Blue);
 	public static void WriteDebug(string text) { if (Debug) WriteHighlighted(text, ConsoleColor.DarkYellow); }
-	public static void WriteLine(string text, char underlineChar = '=')
+	public static void WriteLine(string text, char underlineChar = '─')
 	{
 		for (int i = 0; i < text.Length; i++) Console.Write(underlineChar);
 		Console.WriteLine();
 	}
 	public static void WriteBanner(string text)
 	{
+		Console.Write($"{Icons.Banner} ");
 		WriteLine(text);
 		Console.WriteLine(text);
+		Console.Write($"{Icons.Banner} ");
 		WriteLine(text);
 	}
 	public static void WriteHelp()
@@ -159,6 +216,26 @@ internal static class Program
 	}
 	private static int Main(string[] args)
 	{
+		if (args.Length > 0)
+		{
+			var command = args[0];
+			if (command is "seed" or "export" or "audit")
+				return RunCommand(command, args[1..]);
+		}
+
+		if (HasOption(args, "--events", "--event-machine", "--event-level"))
+		{
+			Messages.WriteError(
+				"The legacy audit flags were replaced in 4.x. Use 'pits audit <PitName> " +
+				"[--machine <all|local|name>] [--level <severity>] [--json]'.");
+			return 1;
+		}
+
+		return RunMappedArguments(args);
+	}
+
+	private static int RunMappedArguments(string[] args)
+	{
 		try
 		{
 			if (HasOption(args, "-v", "--version"))
@@ -176,7 +253,8 @@ internal static class Program
 			bool events = Messages.Events = HasOption(args, "--events");
 			string? eventMachine = ParamValue(args, "--event-machine");
 			string? eventLevel = ParamValue(args, "--event-level");
-			string? cloudProvider = Messages.CloudProvider = ParamValue(args, "-c", "--cloudprovider", "--cloud");
+			var requestedCloudProvider = ParamValue(args, "-c", "--cloudprovider", "--cloud");
+			string? cloudProvider = Messages.CloudProvider = ResolveCloudProvider(requestedCloudProvider);
 			var pitRootParam = ParamValue(args, "-r", "--pitroot");
 			var sourceParam = Messages.Source = ParamValue(args, "-s", "--source");
 			var exportParam = Messages.Export = ParamValue(args, "-e", "--export");
@@ -216,19 +294,19 @@ internal static class Program
 			// create a process flag, acquire master authority, or write an audit event.
 			if (events)
 			{
-				if (wwwa)
+				if (wwwa && !string.IsNullOrWhiteSpace(pitName))
 				{
-					Messages.WriteError("--wwwa cannot be combined with --events; audit mode requires one positional pit name.");
+					Messages.WriteError("Audit accepts either one positional pit name or --wwwa, not both.");
 					return 1;
 				}
-				if (string.IsNullOrWhiteSpace(pitName))
+				if (!wwwa && string.IsNullOrWhiteSpace(pitName))
 				{
-					Messages.WriteError("--events requires one positional pit name, e.g. 'pits -r <root> Person --events'.");
+					Messages.WriteError("Audit requires one positional pit name or --wwwa.");
 					return 1;
 				}
 				if (pitRoot == null)
 				{
-					Messages.WriteError($"Cannot resolve pit '{pitName}' without -r or --pitroot.");
+					Messages.WriteError("Cannot resolve audit target without -r or --pitroot.");
 					return 1;
 				}
 				var minLevel = LogLevel.Trace;
@@ -237,7 +315,9 @@ internal static class Program
 					Messages.WriteError($"Invalid --event-level '{eventLevel}'. Valid values: Trace, Debug, Information, Warning, Error, Critical.");
 					return 1;
 				}
-				return ShowEvents(pitRoot / pitName, eventMachine ?? "all", minLevel, json);
+				return wwwa
+					? ShowEvents(Messages.WwwaFiles.Select(name => pitRoot / name), eventMachine ?? "all", minLevel, json)
+					: ShowEvents([pitRoot / pitName!], eventMachine ?? "all", minLevel, json);
 			}
 			// WWWA seed mode: -s sourceDir --wwwa -r pitroot
 			if (wwwa && !string.IsNullOrWhiteSpace(sourceParam) && !sourceParam.EndsWith(".pit", StringComparison.OrdinalIgnoreCase))
@@ -375,6 +455,188 @@ internal static class Program
 		}
 		return 1;
 	}
+
+	private static int RunCommand(string command, string[] args)
+	{
+		try
+		{
+			if (HasOption(args, "-h", "--help"))
+			{
+				WriteCommandHelp(command);
+				return 0;
+			}
+
+			return command switch
+			{
+				"seed" => RunSeedCommand(args),
+				"export" => RunExportCommand(args),
+				"audit" => RunAuditCommand(args),
+				_ => throw new ArgumentException($"Unknown command '{command}'.")
+			};
+		}
+		catch (ArgumentException ex)
+		{
+			Messages.WriteError($"CLI Error: {ex.Message}");
+			Messages.WriteInfo($"Run 'pits {command} --help' for command usage.");
+			return 1;
+		}
+	}
+
+	private static int RunSeedCommand(string[] args)
+	{
+		var valueOptions = GlobalValueOptions.Concat(["--source"]).ToHashSet(StringComparer.Ordinal);
+		var allowed = GlobalSwitchOptions.Concat(valueOptions).Concat(["--wwwa"]).ToHashSet(StringComparer.Ordinal);
+		var positionals = ValidateCommandTokens(args, allowed, valueOptions);
+		var wwwa = HasOption(args, "--wwwa");
+		var source = ParamValue(args, "--source");
+
+		if (string.IsNullOrWhiteSpace(source))
+			throw new ArgumentException("seed requires --source <file-or-directory>.");
+		if (wwwa && positionals.Count > 0)
+			throw new ArgumentException("seed accepts either <PitName> or --wwwa, not both.");
+		if (!wwwa && positionals.Count != 1)
+			throw new ArgumentException("seed requires exactly one <PitName>, or --wwwa for the four-pit source directory.");
+
+		return RunMappedArguments(args);
+	}
+
+	private static int RunExportCommand(string[] args)
+	{
+		var valueOptions = GlobalValueOptions.Concat(["--out-dir"]).ToHashSet(StringComparer.Ordinal);
+		var allowed = GlobalSwitchOptions.Concat(valueOptions).Concat(["--json", "--wwwa"]).ToHashSet(StringComparer.Ordinal);
+		var positionals = ValidateCommandTokens(args, allowed, valueOptions);
+		var wwwa = HasOption(args, "--wwwa");
+		var json = HasOption(args, "--json");
+		var outDir = ParamValue(args, "--out-dir");
+
+		if (wwwa && positionals.Count > 0)
+			throw new ArgumentException("export accepts either <PitName> or --wwwa, not both.");
+		if (!wwwa && positionals.Count != 1)
+			throw new ArgumentException("export requires exactly one <PitName>, or --wwwa.");
+		if (json == !string.IsNullOrWhiteSpace(outDir))
+			throw new ArgumentException("export requires exactly one output mode: --json or --out-dir <dir>.");
+
+		return RunMappedArguments(ReplaceOption(args, "--out-dir", "--export"));
+	}
+
+	private static int RunAuditCommand(string[] args)
+	{
+		var valueOptions = GlobalValueOptions.Concat(["--machine", "--level"]).ToHashSet(StringComparer.Ordinal);
+		var allowed = GlobalSwitchOptions.Concat(valueOptions).Concat(["--json", "--wwwa"]).ToHashSet(StringComparer.Ordinal);
+		var positionals = ValidateCommandTokens(args, allowed, valueOptions);
+		var wwwa = HasOption(args, "--wwwa");
+
+		if (wwwa && positionals.Count > 0)
+			throw new ArgumentException("audit accepts either <PitName> or --wwwa, not both.");
+		if (!wwwa && positionals.Count != 1)
+			throw new ArgumentException("audit requires exactly one <PitName>, or --wwwa.");
+
+		var mapped = ReplaceOption(args, "--machine", "--event-machine");
+		mapped = ReplaceOption(mapped, "--level", "--event-level");
+		return RunMappedArguments([.. mapped, "--events"]);
+	}
+
+	private static readonly string[] GlobalValueOptions =
+	[
+		"-r", "--pitroot", "-c", "--cloudprovider", "--cloud"
+	];
+
+	private static readonly string[] GlobalSwitchOptions =
+	[
+		"-h", "--help", "-v", "--version", "-b", "--debug", "-n", "--nologo", "--retain-window"
+	];
+
+	private static List<string> ValidateCommandTokens(
+		string[] args,
+		IReadOnlySet<string> allowedOptions,
+		IReadOnlySet<string> valueOptions)
+	{
+		var positionals = new List<string>();
+		for (var i = 0; i < args.Length; i++)
+		{
+			var token = args[i];
+			if (!token.StartsWith("-", StringComparison.Ordinal))
+			{
+				positionals.Add(token);
+				continue;
+			}
+			if (!allowedOptions.Contains(token))
+				throw new ArgumentException($"Unknown option '{token}'.");
+			if (!valueOptions.Contains(token))
+				continue;
+			if (i + 1 >= args.Length || args[i + 1].StartsWith("-", StringComparison.Ordinal))
+				throw new ArgumentException($"The option '{token}' requires a value.");
+			i++;
+		}
+		return positionals;
+	}
+
+	private static string[] ReplaceOption(string[] args, string source, string target)
+		=> args.Select(token => token == source ? target : token).ToArray();
+
+	private static string? ResolveCloudProvider(string? requestedCloudProvider)
+	{
+		if (string.IsNullOrWhiteSpace(requestedCloudProvider))
+			return null;
+
+		return ResolveAllowedCloudProvider(requestedCloudProvider, Messages.CloudProviderOptions());
+	}
+
+	internal static string? ResolveConfiguredCloudProvider(
+		string? requestedCloudProvider,
+		IEnumerable<string> defaultCloudOrder,
+		IEnumerable<string> configuredCloudProviders)
+	{
+		if (string.IsNullOrWhiteSpace(requestedCloudProvider))
+			return null;
+
+		var allowed = Messages.FilterConfiguredDefaultCloudProviders(
+			defaultCloudOrder,
+			configuredCloudProviders);
+		return ResolveAllowedCloudProvider(requestedCloudProvider, allowed);
+	}
+
+	private static string ResolveAllowedCloudProvider(
+		string requestedCloudProvider,
+		IReadOnlyList<string> allowed)
+	{
+		var resolved = allowed.FirstOrDefault(provider =>
+			string.Equals(provider, requestedCloudProvider, StringComparison.OrdinalIgnoreCase));
+		if (resolved != null)
+			return resolved;
+
+		var available = allowed.Count > 0 ? string.Join(", ", allowed) : "none";
+		throw new ArgumentException(
+			$"The cloud provider '{requestedCloudProvider}' is not configured as a DefaultDrive on this machine. " +
+			$"Configured DefaultCloudOrder options: {available}.");
+	}
+
+	private static void WriteCommandHelp(string command)
+	{
+		var lines = command switch
+		{
+			"seed" => new[]
+			{
+				"Usage: pits seed <PitName> --source <file> [global options]",
+				"       pits seed --wwwa --source <directory> [global options]",
+				"Imports JSON/JSON5 into one pit or the four WWWA pits."
+			},
+			"export" => new[]
+			{
+				"Usage: pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [global options]",
+				"Exports one pit or a resolved WWWA projection to files or standard output."
+			},
+			"audit" => new[]
+			{
+				"Usage: pits audit (<PitName> | --wwwa) [--machine <all|local|name>] [--level <severity>] [--json] [global options]",
+				"Reads durable events without opening a Pit or creating coordination artifacts."
+			},
+			_ => Array.Empty<string>()
+		};
+		foreach (var line in lines)
+			Messages.WriteSuccess(line);
+		Messages.WriteInfo("Global options: -r|--pitroot, -c|--cloud, -b|--debug, -n|--nologo, --retain-window");
+	}
 	#region Helpers for argument parsing
 	private static readonly string[] SwitchesWithValues = { "-s", "--source", "-r", "--pitroot", "-e", "--export", "-c", "--cloudprovider", "--cloud", "--event-machine", "--event-level" };
 	private static string? ParamValue(string[] options, params string[] aliases)
@@ -422,9 +684,15 @@ internal static class Program
 	/// authority, or writing an audit event. Output is deterministic: ordered by machine,
 	/// UTC time, and event identity.
 	/// </summary>
-	private static int ShowEvents(RaiPath pitDirectory, string machineFilter, LogLevel minLevel, bool json)
+	private static int ShowEvents(IEnumerable<RaiPath> pitDirectories, string machineFilter, LogLevel minLevel, bool json)
 	{
-		var events = PitAudit.Read(pitDirectory, machineFilter, minLevel);
+		var directories = pitDirectories.ToList();
+		var events = directories
+			.SelectMany(directory => PitAudit.Read(directory, machineFilter, minLevel))
+			.OrderBy(e => e.Machine, StringComparer.Ordinal)
+			.ThenBy(e => e.UtcTime)
+			.ThenBy(e => e.EventId, StringComparer.Ordinal)
+			.ToList();
 		if (json)
 		{
 			var array = new JArray(events.Select(e => e.Content));
@@ -433,7 +701,7 @@ internal static class Program
 		}
 		if (events.Count == 0)
 		{
-			Messages.WriteInfo($"No matching events under {pitDirectory.FullPath}{OsLib.EventDirectory.Name}.");
+			Messages.WriteInfo($"No matching events under {string.Join(", ", directories.Select(directory => directory.FullPath + OsLib.EventDirectory.Name))}.");
 			return 0;
 		}
 		foreach (var e in events)

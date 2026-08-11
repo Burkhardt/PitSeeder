@@ -21,7 +21,8 @@ public class PitRootCloudResolutionTests
 		Assert.Equal(0, exitCode);
 		Assert.NotNull(Messages.PitRoot);
 		Assert.Equal(expectedPitRoot, Messages.PitRoot.FullPath);
-		Assert.Contains($"PitRoot\t", output);
+		Assert.Contains("-r, --pitroot", output);
+		Assert.DoesNotContain($"{Icons.Info} PitRoot\t", output);
 		Assert.Contains(expectedPitRoot, output);
 	}
 

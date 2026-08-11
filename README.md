@@ -8,11 +8,13 @@ PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https:
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
-## 4.0.0
+## 4.0.1
 
-- Coordinated major release prep: aligns `PitSeeder` with `JsonPit 4.0.0` and `OsLibCore 4.0.0`.
+- Adds command-first `seed`, `export`, and `audit` syntax for CR006.
+- Keeps established flat seed/export invocations working throughout `4.x`; the legacy parser is scheduled for removal in `5.x.x`.
+- Moves the recent `--events`, `--event-machine`, and `--event-level` surface directly to `audit`, `--machine`, and `--level` without a legacy audit mode.
 - Keeps `PitSeeder` last in the coordinated release order, immediately after `ImgSeeder`/`iorg`.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.0.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.0.0.md)
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.0.1.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.0.1.md)
 
 ## Install
 
@@ -36,11 +38,13 @@ sudo dotnet tool update PitSeeder --tool-path /usr/local/bin
 
 ## CLI Reference
 
-```
-pits [options] [<pit name>]
+```text
+pits seed (<PitName> | --wwwa) --source <file-or-directory> [global options]
+pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [global options]
+pits audit (<PitName> | --wwwa) [--machine <filter>] [--level <severity>] [--json] [global options]
 ```
 
-| Option | Description |
+| Global option | Description |
 |--------|-------------|
 | `-h`, `--help` | Print all options with resolved paths |
 | `-v`, `--version` | Print version info |
@@ -48,30 +52,39 @@ pits [options] [<pit name>]
 | `-b`, `--debug` | Enable debug output |
 | `-r`, `--pitroot` | Root directory containing pits; when used with `-c`, this is relative to the configured cloud root |
 | `-c`, `--cloud` | Cloud provider name (looks up root in `~/.config/RAIkeep.json5`) |
-| `-s`, `--source` | Source file for import (JSON or JSON5) |
-| `-e`, `--export` | Export directory for JSON output |
-| `--json` | Export to stdout (for piping to `jq`, `grep`, etc.) |
-| `--wwwa` | Operate on all 4 WWWA pits (Person, Object, Place, Activity) |
 | `--retain-window` | Keep this CLI process activity window until the normal timeout instead of releasing it on exit |
-| `--events` | Read-only audit of a pit's durable JsonPit recovery events (requires one positional pit name) |
-| `--event-machine` | `all` \| `local` \| `<machine>` filter for `--events` (default: `all`) |
-| `--event-level` | Case-insensitive inclusive minimum severity for `--events`: `Trace`, `Debug`, `Information`, `Warning`, `Error`, `Critical` (default: `Trace`) |
-| `<pit name>` | Positional argument: the pit to operate on (e.g., `Person`) |
+
+`--source` belongs to `seed`; `--out-dir` belongs to `export`; `--machine` and
+`--level` belong to `audit`. `--json` is available on `export` and `audit`.
+Run `pits <command> --help` for contextual help.
+
+When `-c`/`--cloud` is supplied, the provider must occur in
+`Os.Config.DefaultCloudOrder` and have a non-empty entry in `Os.Config.Cloud`.
+Having only a `Cloud.<provider>` path does not enable that provider for CLI use;
+matching is case-insensitive and the configured spelling is retained.
 
 ## Events audit mode
 
-`pits -r <root> <PitName> --events` reads the pit's durable recovery events from its
+`pits audit <PitName> -r <root>` reads the pit's durable recovery events from its
 `Events` child directory. It is strictly read-only: it opens no `Pit`, creates no
 process or master flag, merges nothing, and writes no audit event. With `--json` it
 emits the filtered events as a JSON array; otherwise output is human-readable and
 ordered deterministically by machine, UTC time, and event identity.
 
 ```zsh
-pits -n -r /path/to/pitroot/ Person --events --event-level warning
-pits -n -r /path/to/pitroot/ Person --events --json | jq '.[].Stage'
+pits audit Person -n -r /path/to/pitroot/ --level warning
+pits audit Person -n -r /path/to/pitroot/ --json | jq '.[].Stage'
 ```
 
-`--wwwa` cannot be combined with `--events`.
+Use `pits audit --wwwa` to aggregate the four WWWA event directories. Legacy
+`--events`, `--event-machine`, and `--event-level` invocations fail with migration
+guidance rather than being silently reinterpreted.
+
+## 4.x legacy transition
+
+Existing flat seed/export invocations remain supported in `4.x`, including `-s`,
+`-e`, positional pit names, direct `.pit` input, and WWWA seed/export. Command-first
+syntax is preferred for new scripts. The `5.x.x` line will require subcommands.
 
 ## Process-window lifecycle
 
@@ -88,7 +101,7 @@ The process activity window is not the master writer ticket. A completed seed co
 Import a JSON5 file into a pit under the given pit root:
 
 ```bash
-pits -s ./sample/Person.json5 -r ./output/
+pits seed Person --source ./sample/Person.json5 -r ./output/
 ```
 
 This creates `./output/Person/Person.pit`.
@@ -98,13 +111,13 @@ This creates `./output/Person/Person.pit`.
 Import all four WWWA files (Person, Object, Place, Activity) from a source directory:
 
 ```bash
-pits -s ./sample/ -r ./output/ --wwwa
+pits seed --wwwa --source ./sample/ -r ./output/
 ```
 
 ### Export a single pit to a file
 
 ```bash
-pits -r /path/to/pitroot/ Person -e ~/export/
+pits export Person -r /path/to/pitroot/ --out-dir ~/export/
 ```
 
 Writes `~/export/Person.json` containing the projected current state of all items.
@@ -112,7 +125,7 @@ Writes `~/export/Person.json` containing the projected current state of all item
 ### Export a single pit to stdout
 
 ```bash
-pits -n -r /path/to/pitroot/ Person --json
+pits export Person -n -r /path/to/pitroot/ --json
 ```
 
 Output:
@@ -135,7 +148,7 @@ Output:
 Because `--json` writes to stdout, standard UNIX piping works (just add -n to suppress the banner):
 
 ```bash
-pits -n -r /path/to/pitroot/ Person --json | jq '.[] | select(.Id == "Nomsa") | .Instruments'
+pits export Person -n -r /path/to/pitroot/ --json | jq '.[] | select(.Id == "Nomsa") | .Instruments'
 ```
 
 ```json
@@ -145,7 +158,7 @@ pits -n -r /path/to/pitroot/ Person --json | jq '.[] | select(.Id == "Nomsa") | 
 ### Export all WWWA pits with resolved foreign keys
 
 ```bash
-pits -r /path/to/pitroot/ --wwwa -e ~/export/
+pits export --wwwa -r /path/to/pitroot/ --out-dir ~/export/
 ```
 
 Writes `~/export/wwwa.json` with all four pits merged into a single JSON object. Foreign key references in `Who`, `What`, `Where`, and `Activity` sections are resolved one level deep. Resolved wrappers dissolve and their contents are promoted to the item level; unresolved wrappers remain as-is.
@@ -171,7 +184,7 @@ becomes:
 The same works with stdout:
 
 ```bash
-pits -n -r /path/to/pitroot/ --wwwa --json | jq '.Place[] | select((.Id | startswith("SD")) or (.Name | contains("Zoo"))) | {Id, Name}'
+pits export --wwwa -n -r /path/to/pitroot/ --json | jq '.Place[] | select((.Id | startswith("SD")) or (.Name | contains("Zoo"))) | {Id, Name}'
 ```
 
 ```json
@@ -190,7 +203,7 @@ pits -n -r /path/to/pitroot/ --wwwa --json | jq '.Place[] | select((.Id | starts
 Use `-c` to look up a cloud storage root from `~/.config/RAIkeep.json5`:
 
 ```bash
-pits -c OneDrive -r LiveAfricaStage Person --json
+pits export Person -c OneDrive -r LiveAfricaStage --json
 ```
 
 This resolves the cloud root from the config and appends the `-r` value as a provider-relative path. If `OneDrive` is configured as:

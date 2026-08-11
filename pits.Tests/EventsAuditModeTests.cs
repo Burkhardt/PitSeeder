@@ -7,7 +7,7 @@ using OsLib;
 namespace PitSeeder.Tests;
 
 /// <summary>
-/// CR003 / recovery-concept scenario 28 — <c>pits --events</c> is a filtered,
+/// CR003 / recovery-concept scenario 28 and CR006 — <c>pits audit</c> is a filtered,
 /// deterministic, strictly read-only audit path: it opens no <see cref="Pit"/>, creates
 /// no process or master flag, merges nothing, and writes no audit event.
 /// </summary>
@@ -83,7 +83,7 @@ public sealed class EventsAuditModeTests : IDisposable
 	public void Events_DefaultFilters_EmitAllMachines_DeterministicallyOrdered_WithoutSideEffects()
 	{
 		var before = SnapshotPitDirectory();
-		var run = RunPits("-n", "-r", root.FullPath, PitName, "--events");
+		var run = RunPits("audit", "-n", "-r", root.FullPath, PitName);
 		Assert.Equal(0, run.exitCode);
 
 		// Deterministic human ordering: machine, UTC time, event identity.
@@ -100,7 +100,7 @@ public sealed class EventsAuditModeTests : IDisposable
 	[Fact]
 	public void Events_JsonOutput_EmitsFilteredEventsAsParseableJson()
 	{
-		var run = RunPits("-n", "-r", root.FullPath, PitName, "--events", "--json", "--event-level", "warning");
+		var run = RunPits("audit", "-n", "-r", root.FullPath, PitName, "--json", "--level", "warning");
 		Assert.Equal(0, run.exitCode);
 		var jsonStart = run.output.IndexOf('[');
 		Assert.True(jsonStart >= 0, $"Expected a JSON array in output: {run.output}");
@@ -113,19 +113,19 @@ public sealed class EventsAuditModeTests : IDisposable
 	[Fact]
 	public void Events_MachineFilters_SupportAllLocalAndNamedMachine()
 	{
-		var local = RunPits("-n", "-r", root.FullPath, PitName, "--events", "--event-machine", "local", "--json");
+		var local = RunPits("audit", "-n", "-r", root.FullPath, PitName, "--machine", "local", "--json");
 		Assert.Equal(0, local.exitCode);
 		var localEvents = JArray.Parse(local.output[local.output.IndexOf('[')..]);
 		Assert.Equal(2, localEvents.Count);
 		Assert.All(localEvents, e => Assert.Equal(Environment.MachineName, (string?)e["Machine"]));
 
-		var named = RunPits("-n", "-r", root.FullPath, PitName, "--events", "--event-machine", "Zebra", "--json");
+		var named = RunPits("audit", "-n", "-r", root.FullPath, PitName, "--machine", "Zebra", "--json");
 		Assert.Equal(0, named.exitCode);
 		var zebraEvents = JArray.Parse(named.output[named.output.IndexOf('[')..]);
 		Assert.Equal(2, zebraEvents.Count);
 		Assert.All(zebraEvents, e => Assert.Equal("Zebra", (string?)e["Machine"]));
 
-		var all = RunPits("-n", "-r", root.FullPath, PitName, "--events", "--event-machine", "all", "--json");
+		var all = RunPits("audit", "-n", "-r", root.FullPath, PitName, "--machine", "all", "--json");
 		Assert.Equal(0, all.exitCode);
 		Assert.Equal(4, JArray.Parse(all.output[all.output.IndexOf('[')..]).Count);
 	}
@@ -133,35 +133,48 @@ public sealed class EventsAuditModeTests : IDisposable
 	[Fact]
 	public void Events_LevelFilter_IsCaseInsensitive_InvalidLevelFailsWithoutSideEffects()
 	{
-		var mixedCase = RunPits("-n", "-r", root.FullPath, PitName, "--events", "--event-level", "ERROR", "--json");
+		var mixedCase = RunPits("audit", "-n", "-r", root.FullPath, PitName, "--level", "ERROR", "--json");
 		Assert.Equal(0, mixedCase.exitCode);
 		Assert.Single(JArray.Parse(mixedCase.output[mixedCase.output.IndexOf('[')..]));
 
 		var before = SnapshotPitDirectory();
-		var invalid = RunPits("-n", "-r", root.FullPath, PitName, "--events", "--event-level", "loud");
+		var invalid = RunPits("audit", "-n", "-r", root.FullPath, PitName, "--level", "loud");
 		Assert.Equal(1, invalid.exitCode);
-		Assert.Contains("event-level", invalid.output, StringComparison.OrdinalIgnoreCase);
+		Assert.Contains("level", invalid.output, StringComparison.OrdinalIgnoreCase);
 		Assert.Equal(before, SnapshotPitDirectory());
 	}
 
 	[Fact]
-	public void Events_RequiresPositionalPitName_AndRejectsWwwaCombination()
+	public void Events_RequiresPitNameOrWwwa_AndRejectsBothTogether()
 	{
 		var before = SnapshotPitDirectory();
-		var missingName = RunPits("-n", "-r", root.FullPath, "--events");
+		var missingName = RunPits("audit", "-n", "-r", root.FullPath);
 		Assert.Equal(1, missingName.exitCode);
 
-		var wwwa = RunPits("-n", "-r", root.FullPath, PitName, "--events", "--wwwa");
-		Assert.Equal(1, wwwa.exitCode);
-		Assert.Contains("wwwa", wwwa.output, StringComparison.OrdinalIgnoreCase);
+		var both = RunPits("audit", "-n", "-r", root.FullPath, PitName, "--wwwa");
+		Assert.Equal(1, both.exitCode);
+		Assert.Contains("either", both.output, StringComparison.OrdinalIgnoreCase);
+
+		var wwwa = RunPits("audit", "-n", "-r", root.FullPath, "--wwwa", "--json");
+		Assert.Equal(0, wwwa.exitCode);
+		Assert.Equal(4, JArray.Parse(wwwa.output[wwwa.output.IndexOf('[')..]).Count);
 		Assert.Equal(before, SnapshotPitDirectory());
+	}
+
+	[Fact]
+	public void LegacyEventFlags_AreRejectedWithCommandMigrationGuidance()
+	{
+		var run = RunPits("-n", "-r", root.FullPath, PitName, "--events", "--event-level", "warning");
+		Assert.Equal(1, run.exitCode);
+		Assert.Contains("pits audit", run.output, StringComparison.OrdinalIgnoreCase);
+		Assert.Contains("--machine", run.output, StringComparison.OrdinalIgnoreCase);
 	}
 
 	[Fact]
 	public void Events_MissingEventsDirectory_SucceedsEmpty_WithoutCreatingIt()
 	{
 		var emptyPit = (root / "Object").mkdir();
-		var run = RunPits("-n", "-r", root.FullPath, "Object", "--events");
+		var run = RunPits("audit", "-n", "-r", root.FullPath, "Object");
 		Assert.Equal(0, run.exitCode);
 		Assert.False(Directory.Exists((emptyPit / EventDirectory.Name).Path),
 			"A read-only audit must never create the Events directory.");
