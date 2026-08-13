@@ -270,7 +270,7 @@ When a matching tag is pushed from the `RAIkeep` repository, the GitHub Actions 
 - builds self-contained single-file `pits` binaries for `osx-arm64`, `osx-x64`, `linux-x64`, and `win-x64`
 - uploads those self-contained binaries as GitHub release assets on the matching tag
 
-See [BuildFromSource.md](BuildFromSource.md) for:
+See [BuildFromSource.md](https://github.com/Burkhardt/PitSeeder/blob/main/BuildFromSource.md) for:
 
 - building from source
 - building inside the `RAIkeep` workspace against local projects
