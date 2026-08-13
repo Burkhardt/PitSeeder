@@ -8,13 +8,14 @@ PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https:
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
-## 4.0.1
+## 4.1.0
 
-- Adds command-first `seed`, `export`, and `audit` syntax for CR006.
+- Retains the command-first `seed`, `export`, and `audit` syntax introduced for CR006.
 - Keeps established flat seed/export invocations working throughout `4.x`; the legacy parser is scheduled for removal in `5.x.x`.
 - Moves the recent `--events`, `--event-machine`, and `--event-level` surface directly to `audit`, `--machine`, and `--level` without a legacy audit mode.
 - Keeps `PitSeeder` last in the coordinated release order, immediately after `ImgSeeder`/`iorg`.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.0.1.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.0.1.md)
+- Aligns fallback dependencies on `JsonPit 4.1.0` and `OsLibCore 4.1.0`; no PitSeeder CLI behavior changes from 4.0.1.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.1.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.1.0.md)
 
 ## Install
 
