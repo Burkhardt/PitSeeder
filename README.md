@@ -1,5 +1,9 @@
 # PitSeeder
 
+## Terminal font
+
+The `pits` help screen uses embedded Nerd Font provider glyphs. See the RAIkeep [terminal font guide](https://github.com/Burkhardt/RAIkeep/blob/main/doc/TERMINAL_FONTS.md) for Blink, macOS, and Ubuntu setup.
+
 PitSeeder change requests and release notes are centralized in the RAIkeep [`doc/`](https://github.com/Burkhardt/RAIkeep/tree/main/doc) directory under `PitSeeder_...` filenames; they are not stored separately in this child repository.
 
 PitSeeder uses the shared RAIkeep configured cloud-root contract: `Dropbox`, `OneDrive`, `GoogleDrive`, and `ICloudDrive`.

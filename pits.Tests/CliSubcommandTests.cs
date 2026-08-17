@@ -77,6 +77,20 @@ public sealed class CliSubcommandTests : IDisposable
 		Assert.Contains("seed, export, audit", rootHelp.output, StringComparison.OrdinalIgnoreCase);
 		Assert.Contains("(default)", rootHelp.output);
 		Assert.DoesNotContain(" PitRoot", rootHelp.output);
+		Assert.DoesNotContain("①", rootHelp.output, StringComparison.Ordinal);
+		var cloudLine = Assert.Single(rootHelp.output.Split('\n', StringSplitOptions.RemoveEmptyEntries),
+			line => line.StartsWith("-c, --cloud", StringComparison.Ordinal)).TrimEnd('\r');
+		var firstProvider = Assert.Single(Messages.CloudProviderOptions().Take(1));
+		var providerIcon = firstProvider.ToLowerInvariant() switch
+		{
+			"dropbox" => Icons.DropboxBoxOutline,
+			"googledrive" => Icons.GoogleDriveBoxOutline,
+			"iclouddrive" => Icons.ICloudDriveBoxOutline,
+			"onedrive" => Icons.OneDriveBoxOutline,
+			_ => throw new Xunit.Sdk.XunitException($"Unexpected configured cloud provider: {firstProvider}")
+		};
+		Assert.Contains(providerIcon, cloudLine, StringComparison.Ordinal);
+		Assert.EndsWith("  ", cloudLine, StringComparison.Ordinal);
 	}
 
 	[Fact]

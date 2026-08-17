@@ -19,8 +19,16 @@ public static class Icons
 	public const char Upload = '\ueac3';
 	public const char Banner = '\ueb1e';
 	public const char NoBanner = '\ueb24';
-	public static readonly string[] NumberCircles = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"];
-	public static readonly string[] FilledNumberCircles = ["❶", "❷", "❸", "❹", "❺", "❻", "❼", "❽", "❾"];
+	public const string DropboxBoxOutline = "\U000F0BF4";
+	public const string GoogleDriveBoxOutline = "\U000F0BFD";
+	public const string ICloudDriveBoxOutline = "\U000F0C03";
+	public const string OneDriveBoxOutline = "\U000F0C15";
+	public const string HelpLineWidthCompensation = "  ";
+	public static readonly string[] NumberBoxOutlines =
+	[
+		"\U000F03A6", "\U000F03A9", "\U000F03AC", "\U000F03AE", "\U000F03B0",
+		"\U000F03B5", "\U000F03B8", "\U000F03BB", "\U000F03BE"
+	];
 }
 public static class Messages
 {
@@ -80,26 +88,27 @@ public static class Messages
 		var options = CloudProviderOptions();
 		return options.Length > 0
 			? string.Join(", ", options.Select((name, index) =>
-				$"{NumberIcon(index + 1)} {name}{(index == 0 ? " (default)" : string.Empty)}"))
+				$"{CloudProviderIcon(name, index + 1)} {name}{(index == 0 ? " (default)" : string.Empty)}"))
 			: "no DefaultCloudOrder providers are configured";
 	}
 	private static string CloudIcon()
 	{
 		var options = CloudProviderOptions();
-		var index = Array.FindIndex(options, option =>
+		var provider = options.FirstOrDefault(option =>
 			string.Equals(option, CloudProvider, StringComparison.OrdinalIgnoreCase));
-		return index >= 0 ? SelectedNumberIcon(index + 1) : Icons.Folder.ToString();
+		return provider != null ? CloudProviderIcon(provider, Array.IndexOf(options, provider) + 1) : Icons.Folder.ToString();
 	}
-	private static string NumberIcon(int number) => number switch
-	{
-		> 0 when number <= Icons.NumberCircles.Length => Icons.NumberCircles[number - 1],
-		_ => $"({number})"
-	};
-	private static string SelectedNumberIcon(int number) => number switch
-	{
-		> 0 when number <= Icons.FilledNumberCircles.Length => Icons.FilledNumberCircles[number - 1],
-		_ => $"({number})"
-	};
+	private static string CloudProviderIcon(string provider, int fallbackNumber)
+		=> provider.ToLowerInvariant() switch
+		{
+			"dropbox" => Icons.DropboxBoxOutline,
+			"googledrive" => Icons.GoogleDriveBoxOutline,
+			"iclouddrive" => Icons.ICloudDriveBoxOutline,
+			"onedrive" => Icons.OneDriveBoxOutline,
+			_ => fallbackNumber is > 0 and <= 9
+				? Icons.NumberBoxOutlines[fallbackNumber - 1]
+				: $"({fallbackNumber})"
+		};
 	internal static string[] CloudProviderOptions()
 	{
 		var defaultCloudOrder = new List<string>();
@@ -201,7 +210,7 @@ public static class Messages
 	}
 	public static void WriteHelp()
 	{
-		foreach (var line in Help) WriteSuccess(line);
+		foreach (var line in Help) WriteSuccess(line + Icons.HelpLineWidthCompensation);
 	}
 }
 internal static class Program
