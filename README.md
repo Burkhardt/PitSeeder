@@ -12,6 +12,14 @@ PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https:
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
+## 4.2.1
+
+- Uses glyphs embedded in `JetBrainsMonoNLNerdFontPropo-Regular` for cloud-provider and numbered help options, avoiding fallback-font width differences.
+- Reserves two terminal cells at the end of help lines for renderers such as Blink.
+- Continues to depend on `JsonPit 4.2.0` and `OsLibCore 4.2.0`; no library package version changes are part of this CLI-only patch.
+- Terminal setup guidance: [TERMINAL_FONTS.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/TERMINAL_FONTS.md)
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.1.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.1.md)
+
 ## 4.2.0
 
 - Retains the command-first `seed`, `export`, and `audit` syntax introduced for CR006.
@@ -19,7 +27,7 @@ Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can buil
 - Moves the recent `--events`, `--event-machine`, and `--event-level` surface directly to `audit`, `--machine`, and `--level` without a legacy audit mode.
 - Keeps `PitSeeder` last in the coordinated release order, immediately after `ImgSeeder`/`iorg`.
 - Aligns fallback dependencies on `JsonPit 4.2.0` and `OsLibCore 4.2.0`; no PitSeeder CLI behavior changes from 4.1.0.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.0.md)
+- Release notes: [PitSeeder_RELEASE_NOTES_4.2.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.0.md)
 
 ## Install
 
