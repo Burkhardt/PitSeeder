@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Newtonsoft.Json.Linq;
 using OsLib;
 
@@ -112,11 +111,11 @@ public sealed class CliSubcommandTests : IDisposable
 	}
 
 	[Fact]
-	public void Version_PrintsPreparedPackageVersion()
+	public void PitsCommand_LiveSmoke_InvokesRealCliVersion()
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.2.1", run.output.Trim());
+		Assert.Equal("pits v4.2.2", run.output.Trim());
 	}
 
 	private void CreatePit()
@@ -146,20 +145,7 @@ public sealed class CliSubcommandTests : IDisposable
 		var pitsDll = new RaiFile(new RaiPath(AppContext.BaseDirectory), "pits", "dll");
 		Assert.True(pitsDll.Exists(), $"Expected pits.dll at {pitsDll.FullName}");
 
-		var startInfo = new ProcessStartInfo("dotnet")
-		{
-			RedirectStandardOutput = true,
-			RedirectStandardError = true,
-			UseShellExecute = false
-		};
-		startInfo.ArgumentList.Add(pitsDll.FullName);
-		foreach (var arg in args)
-			startInfo.ArgumentList.Add(arg);
-
-		using var process = Process.Start(startInfo)!;
-		var stdout = process.StandardOutput.ReadToEnd();
-		var stderr = process.StandardError.ReadToEnd();
-		process.WaitForExit();
-		return (process.ExitCode, stdout + stderr);
+		var result = PitsCommand.ForManagedAssembly(pitsDll).Run(args);
+		return (result.ExitCode, result.Output);
 	}
 }

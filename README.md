@@ -2,7 +2,14 @@
 
 ## Terminal font
 
-The `pits` help screen uses embedded Nerd Font provider glyphs. See the RAIkeep [terminal font guide](https://github.com/Burkhardt/RAIkeep/blob/main/doc/TERMINAL_FONTS.md) for Blink, macOS, and Ubuntu setup.
+> **Font note:** The `pits` help screen uses glyph icons from Nerd Fonts. Most
+> Nerd Font-patched fonts render correctly in most terminal environments. Blink
+> on iPadOS showed clipping and character-width problems with some choices; the
+> tested solution was Blink's
+> [Jet Brains Mono Nerd Font stylesheet](https://github.com/blinksh/patched-fonts/blob/main/Jet%20Brains%20Mono%20Nerd%20Font.css).
+> See the RAIkeep
+> [terminal font guide](https://github.com/Burkhardt/RAIkeep/blob/main/doc/TERMINAL_FONTS.md)
+> for Blink, macOS, and Ubuntu setup.
 
 PitSeeder change requests and release notes are centralized in the RAIkeep [`doc/`](https://github.com/Burkhardt/RAIkeep/tree/main/doc) directory under `PitSeeder_...` filenames; they are not stored separately in this child repository.
 
@@ -11,6 +18,12 @@ PitSeeder uses the shared RAIkeep configured cloud-root contract: `Dropbox`, `On
 PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https://github.com/Burkhardt/RAIkeep) data stores. It can seed pits from JSON/JSON5 source files, export pits to JSON, and produce resolved WWWA exports where foreign key references are expanded inline.
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
+
+## 4.2.2
+
+- Aligns fallback dependencies on `JsonPit 4.2.2` and `OsLibCore 4.2.2` for the coordinated CR010 release.
+- Retains the `4.2.1` Nerd Font glyphs, Blink guidance, and terminal clipping tolerance unchanged.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.2.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.2.md)
 
 ## 4.2.1
 

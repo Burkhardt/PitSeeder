@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using JsonPit;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
@@ -185,20 +184,7 @@ public sealed class EventsAuditModeTests : IDisposable
 		var pitsDll = new RaiFile(new RaiPath(AppContext.BaseDirectory), "pits", "dll");
 		Assert.True(pitsDll.Exists(), $"Expected pits.dll at {pitsDll.FullName}");
 
-		var startInfo = new ProcessStartInfo("dotnet")
-		{
-			RedirectStandardOutput = true,
-			RedirectStandardError = true,
-			UseShellExecute = false
-		};
-		startInfo.ArgumentList.Add(pitsDll.FullName);
-		foreach (var arg in args)
-			startInfo.ArgumentList.Add(arg);
-
-		using var process = Process.Start(startInfo)!;
-		var stdout = process.StandardOutput.ReadToEnd();
-		var stderr = process.StandardError.ReadToEnd();
-		process.WaitForExit();
-		return (process.ExitCode, stdout + stderr);
+		var result = PitsCommand.ForManagedAssembly(pitsDll).Run(args);
+		return (result.ExitCode, result.Output);
 	}
 }
