@@ -19,6 +19,13 @@ PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https:
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
+## 4.2.4
+
+- Aligns PitSeeder with the coordinated seven-package RAIkeep 4.2.4 release implementing accepted CR016.
+- Preserves CR015 `delete-property` and `delete-item` behavior unchanged.
+- Aligns fallback dependencies on `JsonPit 4.2.4` and `OsLibCore 4.2.4`.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.4.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.4.md)
+
 ## 4.2.3
 
 - Implements accepted CR015 `delete-property` and `delete-item` commands.
