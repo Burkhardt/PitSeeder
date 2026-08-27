@@ -10,7 +10,7 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageIcon>HardCastle.png</PackageIcon>
 		<PackageProjectUrl>https://github.com/Burkhardt/RAIkeep</PackageProjectUrl>
-		<RepositoryUrl>https://github.com/Burkhardt/RAIkeep.git</RepositoryUrl>
+		<RepositoryUrl>https://github.com/Burkhardt/PitSeeder.git</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageReleaseNotes>4.2.4 coordinated dependency release for accepted CR016.</PackageReleaseNotes>
