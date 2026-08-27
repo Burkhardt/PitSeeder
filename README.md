@@ -19,11 +19,12 @@ PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https:
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
-## 4.2.2
+## 4.2.3
 
-- Aligns fallback dependencies on `JsonPit 4.2.2` and `OsLibCore 4.2.2` for the coordinated CR010 release.
+- Implements accepted CR015 `delete-property` and `delete-item` commands.
+- Aligns fallback dependencies on `JsonPit 4.2.3` and `OsLibCore 4.2.3`.
 - Retains the `4.2.1` Nerd Font glyphs, Blink guidance, and terminal clipping tolerance unchanged.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.2.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.2.md)
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.3.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.3.md)
 
 ## 4.2.1
 
@@ -68,6 +69,8 @@ sudo dotnet tool update PitSeeder --tool-path /usr/local/bin
 pits seed (<PitName> | --wwwa) --source <file-or-directory> [global options]
 pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [global options]
 pits audit (<PitName> | --wwwa) [--machine <filter>] [--level <severity>] [--json] [global options]
+pits delete-property <PitName> <ItemId> <PropertyPath> [global options]
+pits delete-item <PitName> <ItemId> [global options]
 ```
 
 | Global option | Description |
@@ -83,6 +86,25 @@ pits audit (<PitName> | --wwwa) [--machine <filter>] [--level <severity>] [--jso
 `--source` belongs to `seed`; `--out-dir` belongs to `export`; `--machine` and
 `--level` belong to `audit`. `--json` is available on `export` and `audit`.
 Run `pits <command> --help` for contextual help.
+
+### Delete a nested property or item
+
+`delete-property` interprets `PropertyPath` as a dot-delimited JSON path. It
+appends a tombstone without overwriting sibling properties:
+
+```bash
+pits delete-property Activity UC16_SavePits_DevSession What.Chat -c OneDrive -r AIA -n
+```
+
+`delete-item` appends the established item tombstone:
+
+```bash
+pits delete-item Object LegacyRecord -c OneDrive -r AIA -n
+```
+
+Both commands save before returning success, preserve append-only history, and
+release the normal process activity window. `-n` continues to mean
+`--nologo`; it does not suppress persistence.
 
 When `-c`/`--cloud` is supplied, the provider must occur in
 `Os.Config.DefaultCloudOrder` and have a non-empty entry in `Os.Config.Cloud`.

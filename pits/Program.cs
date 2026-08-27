@@ -53,10 +53,12 @@ public static class Messages
 	public static bool Events { get; set; }
 	public static string[] Help =>
 	[
-		$"Commands:\t{Icons.Info}\tseed, export, audit (preferred 4.x syntax)",
+		$"Commands:\t{Icons.Info}\tseed, export, audit, delete-property, delete-item",
 		$"  pits seed <PitName> --source <file>",
 		$"  pits export (<PitName> | --wwwa) (--out-dir <dir> | --json)",
 		$"  pits audit <PitName> [--machine <all|local|name>] [--level <severity>] [--json]",
+		$"  pits delete-property <PitName> <ItemId> <PropertyPath>",
+		$"  pits delete-item <PitName> <ItemId>",
 		$"-h, --help\t{Icons.Help}\tprint out all options",
 		$"-v, --version\t{Icons.Info}\tprint version info",
 		$"-n, --nologo\t{(Banner ? Icons.Banner : Icons.NoBanner)}\tdo not display the banner",
@@ -228,7 +230,7 @@ internal static class Program
 		if (args.Length > 0)
 		{
 			var command = args[0];
-			if (command is "seed" or "export" or "audit")
+			if (command is "seed" or "export" or "audit" or "delete-property" or "delete-item")
 				return RunCommand(command, args[1..]);
 		}
 
@@ -480,6 +482,8 @@ internal static class Program
 				"seed" => RunSeedCommand(args),
 				"export" => RunExportCommand(args),
 				"audit" => RunAuditCommand(args),
+				"delete-property" => RunDeletePropertyCommand(args),
+				"delete-item" => RunDeleteItemCommand(args),
 				_ => throw new ArgumentException($"Unknown command '{command}'.")
 			};
 		}
@@ -487,6 +491,11 @@ internal static class Program
 		{
 			Messages.WriteError($"CLI Error: {ex.Message}");
 			Messages.WriteInfo($"Run 'pits {command} --help' for command usage.");
+			return 1;
+		}
+		catch (Exception ex)
+		{
+			Messages.WriteError($"An internal error occurred.\n{ex.Message}");
 			return 1;
 		}
 	}
@@ -543,6 +552,118 @@ internal static class Program
 		var mapped = ReplaceOption(args, "--machine", "--event-machine");
 		mapped = ReplaceOption(mapped, "--level", "--event-level");
 		return RunMappedArguments([.. mapped, "--events"]);
+	}
+
+	private static int RunDeletePropertyCommand(string[] args)
+	{
+		var valueOptions = GlobalValueOptions.ToHashSet(StringComparer.Ordinal);
+		var allowed = GlobalSwitchOptions.Concat(valueOptions).ToHashSet(StringComparer.Ordinal);
+		var positionals = ValidateCommandTokens(args, allowed, valueOptions);
+		if (positionals.Count != 3)
+			throw new ArgumentException(
+				"delete-property requires exactly <PitName> <ItemId> <PropertyPath>.");
+		ValidatePropertyPath(positionals[2]);
+		return RunDeleteMutation(args, positionals[0], positionals[1], positionals[2]);
+	}
+
+	private static int RunDeleteItemCommand(string[] args)
+	{
+		var valueOptions = GlobalValueOptions.ToHashSet(StringComparer.Ordinal);
+		var allowed = GlobalSwitchOptions.Concat(valueOptions).ToHashSet(StringComparer.Ordinal);
+		var positionals = ValidateCommandTokens(args, allowed, valueOptions);
+		if (positionals.Count != 2)
+			throw new ArgumentException("delete-item requires exactly <PitName> <ItemId>.");
+		return RunDeleteMutation(args, positionals[0], positionals[1], propertyPath: null);
+	}
+
+	private static int RunDeleteMutation(
+		string[] args,
+		string pitName,
+		string itemId,
+		string? propertyPath)
+	{
+		if (string.IsNullOrWhiteSpace(pitName) || string.IsNullOrWhiteSpace(itemId))
+			throw new ArgumentException("PitName and ItemId must be non-empty values.");
+
+		Messages.Debug = HasOption(args, "-b", "--debug");
+		Messages.Banner = !HasOption(args, "-n", "--nologo");
+		Messages.RetainWindow = HasOption(args, "--retain-window");
+		var requestedCloudProvider = ParamValue(args, "-c", "--cloudprovider", "--cloud");
+		var cloudProvider = Messages.CloudProvider = ResolveCloudProvider(requestedCloudProvider);
+		var pitRootParam = ParamValue(args, "-r", "--pitroot");
+		RaiPath? pitRoot = null;
+		if (!string.IsNullOrWhiteSpace(cloudProvider))
+		{
+			string? cloudDirectory = Os.Config?.Cloud?[cloudProvider];
+			if (string.IsNullOrWhiteSpace(cloudDirectory))
+				throw new ArgumentException(
+					$"The requested cloud provider '{cloudProvider}' is missing or empty in {Os.DefaultConfigFileLocation}.");
+			var cloudRoot = new RaiPath(cloudDirectory);
+			pitRoot = !string.IsNullOrWhiteSpace(pitRootParam)
+				? cloudRoot / new RaiRelPath(pitRootParam.TrimStart('/', '\\'))
+				: cloudRoot;
+		}
+		else if (!string.IsNullOrWhiteSpace(pitRootParam))
+		{
+			pitRoot = new RaiPath(pitRootParam);
+		}
+
+		if (pitRoot is null)
+			throw new ArgumentException(
+				$"Cannot resolve pit '{pitName}' without -r or --pitroot, or a configured -c or --cloud provider.");
+
+		Messages.PitRoot = pitRoot;
+		Messages.PitName = pitName;
+		if (Messages.Banner)
+			Messages.WriteBanner($"{Icons.Info} AfricaStage Pit Seeder CLI");
+
+		var pitFile = new PitFile(pitRoot / pitName, pitName);
+		if (!pitFile.Exists())
+		{
+			Messages.WriteError($"Pit file '{pitFile.FullName}' does not exist.");
+			return 1;
+		}
+
+		var pit = TrackPit(new Pit(pitFile, subscriber: CliSubscriber, readOnly: false));
+		try
+		{
+			var item = pit[itemId];
+			if (item is null)
+			{
+				Messages.WriteError($"Item '{itemId}' does not exist in pit '{pitName}'.");
+				return 1;
+			}
+
+			if (propertyPath is null)
+			{
+				if (!pit.Delete(itemId))
+					return 1;
+			}
+			else
+			{
+				item.DeletePropertyPath(propertyPath);
+				pit.Add(item);
+			}
+
+			pit.Save();
+			var operation = propertyPath is null
+				? $"Deleted item '{itemId}'"
+				: $"Deleted property '{propertyPath}' from item '{itemId}'";
+			Messages.WriteSuccess($"{Icons.Success} {operation} in {pitFile.FullName}");
+			return 0;
+		}
+		finally
+		{
+			ReleaseProcessWindow(pit);
+		}
+	}
+
+	private static void ValidatePropertyPath(string propertyPath)
+	{
+		if (string.IsNullOrWhiteSpace(propertyPath) ||
+			propertyPath.Split('.', StringSplitOptions.None).Any(string.IsNullOrWhiteSpace))
+			throw new ArgumentException(
+				"PropertyPath must contain non-empty dot-delimited property names.");
 	}
 
 	private static readonly string[] GlobalValueOptions =
@@ -639,6 +760,16 @@ internal static class Program
 			{
 				"Usage: pits audit (<PitName> | --wwwa) [--machine <all|local|name>] [--level <severity>] [--json] [global options]",
 				"Reads durable events without opening a Pit or creating coordination artifacts."
+			},
+			"delete-property" => new[]
+			{
+				"Usage: pits delete-property <PitName> <ItemId> <PropertyPath> [global options]",
+				"Appends a property tombstone; PropertyPath accepts dot notation such as What.Chat."
+			},
+			"delete-item" => new[]
+			{
+				"Usage: pits delete-item <PitName> <ItemId> [global options]",
+				"Appends an item tombstone so projected reads and exports omit the item."
 			},
 			_ => Array.Empty<string>()
 		};

@@ -36,6 +36,58 @@ public sealed class CliSubcommandTests : IDisposable
 	}
 
 	[Fact]
+	public void DeletePropertyCommand_DeletesNestedProperty_AndPreservesSibling()
+	{
+		var source = new TextFile(root, "activities", "json5")
+		{
+			Lines = ["[{ Id: 'DeleteNested', What: { Instrument: 'Guitar', Chat: 'Legacy' } }]"],
+			Changed = true
+		};
+		source.Save();
+		Assert.Equal(0, RunPits("seed", "Activity", "--source", source.FullName, "-r", root.FullPath, "-n").exitCode);
+
+		var deletion = RunPits(
+			"delete-property", "Activity", "DeleteNested", "What.Chat",
+			"-r", root.FullPath, "-n");
+		Assert.Equal(0, deletion.exitCode);
+
+		var export = RunPits("export", "Activity", "--json", "-r", root.FullPath, "-n");
+		Assert.Equal(0, export.exitCode);
+		var item = Assert.Single(JArray.Parse(export.output[export.output.IndexOf('[')..]));
+		var what = Assert.IsType<JObject>(item["What"]);
+		Assert.Equal("Guitar", what["Instrument"]?.Value<string>());
+		Assert.False(what.ContainsKey("Chat"));
+	}
+
+	[Fact]
+	public void DeleteItemCommand_RemovesItemFromProjectedExport()
+	{
+		var source = new TextFile(root, "objects", "json5")
+		{
+			Lines = ["[{ Id: 'Keep' }, { Id: 'LegacyRecord' }]"],
+			Changed = true
+		};
+		source.Save();
+		Assert.Equal(0, RunPits("seed", "Object", "--source", source.FullName, "-r", root.FullPath, "-n").exitCode);
+
+		var deletion = RunPits("delete-item", "Object", "LegacyRecord", "-r", root.FullPath, "-n");
+		Assert.Equal(0, deletion.exitCode);
+
+		var export = RunPits("export", "Object", "--json", "-r", root.FullPath, "-n");
+		Assert.Equal(0, export.exitCode);
+		var items = JArray.Parse(export.output[export.output.IndexOf('[')..]);
+		Assert.Equal("Keep", (string?)Assert.Single(items)["Id"]);
+	}
+
+	[Fact]
+	public void DeleteCommands_RejectMalformedOrMissingTargets()
+	{
+		Assert.Equal(1, RunPits("delete-property", "Activity", "Item", "What..Chat", "-r", root.FullPath, "-n").exitCode);
+		Assert.Equal(1, RunPits("delete-property", "Activity", "Missing", "What.Chat", "-r", root.FullPath, "-n").exitCode);
+		Assert.Equal(1, RunPits("delete-item", "Activity", "Missing", "-r", root.FullPath, "-n").exitCode);
+	}
+
+	[Fact]
 	public void LegacyExport_RemainsAvailableAlongsideCommandSyntax()
 	{
 		CreatePit();
@@ -69,11 +121,16 @@ public sealed class CliSubcommandTests : IDisposable
 		Assert.Equal(0, auditHelp.exitCode);
 		Assert.Contains("--machine", auditHelp.output);
 		Assert.DoesNotContain("--source", auditHelp.output);
+		var deleteHelp = RunPits("delete-property", "--help");
+		Assert.Equal(0, deleteHelp.exitCode);
+		Assert.Contains("<PropertyPath>", deleteHelp.output);
+		Assert.Contains("What.Chat", deleteHelp.output);
+		Assert.DoesNotContain("--source", deleteHelp.output);
 
 		var rootHelp = RunPits("--help");
 		Assert.Equal(0, rootHelp.exitCode);
 		Assert.DoesNotContain("===", rootHelp.output, StringComparison.Ordinal);
-		Assert.Contains("seed, export, audit", rootHelp.output, StringComparison.OrdinalIgnoreCase);
+		Assert.Contains("seed, export, audit, delete-property, delete-item", rootHelp.output, StringComparison.OrdinalIgnoreCase);
 		Assert.Contains("(default)", rootHelp.output);
 		Assert.DoesNotContain(" PitRoot", rootHelp.output);
 		Assert.DoesNotContain("①", rootHelp.output, StringComparison.Ordinal);
@@ -115,7 +172,7 @@ public sealed class CliSubcommandTests : IDisposable
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.2.2", run.output.Trim());
+		Assert.Equal("pits v4.2.3", run.output.Trim());
 	}
 
 	private void CreatePit()
