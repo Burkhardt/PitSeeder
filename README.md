@@ -19,12 +19,20 @@ PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https:
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
+## 4.2.5
+
+- Implements accepted CR017 with optional `--at <timestamp>` on single-pit and WWWA exports, for both `--json` and `--out-dir`.
+- Requires an explicit `Z` or numeric UTC offset and projects JsonPit history inclusively through that instant.
+- Emits the strict `{ "_export": { "at", "exported" }, "data": ... }` envelope only when `--at` is supplied; existing exports retain their established root shape without it.
+- Aligns fallback dependencies on `JsonPit 4.2.5` and `OsLibCore 4.2.5` and reports `pits v4.2.5`.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.5.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.5.md)
+
 ## 4.2.4
 
 - Aligns PitSeeder with the coordinated seven-package RAIkeep 4.2.4 release implementing accepted CR016.
 - Preserves CR015 `delete-property` and `delete-item` behavior unchanged.
 - Aligns fallback dependencies on `JsonPit 4.2.4` and `OsLibCore 4.2.4`.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.4.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.4.md)
+- 4.2.4 release notes: [PitSeeder_RELEASE_NOTES_4.2.4.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.4.md)
 
 ## 4.2.3
 
@@ -74,7 +82,7 @@ sudo dotnet tool update PitSeeder --tool-path /usr/local/bin
 
 ```text
 pits seed (<PitName> | --wwwa) --source <file-or-directory> [global options]
-pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [global options]
+pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [--at <timestamp>] [global options]
 pits audit (<PitName> | --wwwa) [--machine <filter>] [--level <severity>] [--json] [global options]
 pits delete-property <PitName> <ItemId> <PropertyPath> [global options]
 pits delete-item <PitName> <ItemId> [global options]
@@ -90,7 +98,7 @@ pits delete-item <PitName> <ItemId> [global options]
 | `-c`, `--cloud` | Cloud provider name (looks up root in `~/.config/RAIkeep.json5`) |
 | `--retain-window` | Keep this CLI process activity window until the normal timeout instead of releasing it on exit |
 
-`--source` belongs to `seed`; `--out-dir` belongs to `export`; `--machine` and
+`--source` belongs to `seed`; `--out-dir` and `--at` belong to `export`; `--machine` and
 `--level` belong to `audit`. `--json` is available on `export` and `audit`.
 Run `pits <command> --help` for contextual help.
 
@@ -208,6 +216,50 @@ pits export Person -n -r /path/to/pitroot/ --json | jq '.[] | select(.Id == "Nom
 
 ```json
 ["Voice", "Percussion", "Dance"]
+```
+
+### Export a point in time
+
+Add `--at` to either a single-pit or WWWA export. The timestamp must include
+`Z` or a numeric UTC offset. Projection is inclusive: changes timestamped
+exactly at the cutoff are included.
+
+```bash
+pits export Person -n -r /path/to/pitroot/ --json --at 2026-08-27T12:00:00Z
+```
+
+The output is strict JSON and gains an envelope only for an `--at` export:
+
+```json
+{
+  "_export": {
+    "at": "2026-08-27T12:00:00.0000000Z",
+    "exported": "2026-08-31T18:42:03.1234567Z"
+  },
+  "data": [
+    { "Id": "Nomsa", "Name": "Nomsa Burkhardt" }
+  ]
+}
+```
+
+`at` is the requested historical cutoff. `exported` is when this invocation
+constructed the document from the history then available. It is not a
+distributed synchronization barrier. A later invocation with the same `at`
+can legitimately differ after a delayed or backdated change arrives.
+
+Items that did not yet exist or were deleted at the cutoff are omitted. In a
+WWWA export, a missing projected target is absent from the lookup while the
+source reference remains safely unresolved; export does not rewrite it. The
+existing filenames (`Person.json` and `wwwa.json`) remain unchanged for
+`--out-dir` exports because provenance is inside the document.
+
+Without `--at`, the established unwrapped array/object output remains
+unchanged. With `--at`, select through `.data` when piping:
+
+```bash
+pits export Person -n -r /path/to/pitroot/ --json \
+  --at 2026-08-27T12:00:00+00:00 \
+  | jq '.data[] | select(.Id == "Nomsa")'
 ```
 
 ### Export all WWWA pits with resolved foreign keys

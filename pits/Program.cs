@@ -1,5 +1,7 @@
 ﻿using System.Reflection;
+using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using JsonPit;
 using Microsoft.Extensions.Logging;
 using OsLib;
@@ -55,7 +57,7 @@ public static class Messages
 	[
 		$"Commands:\t{Icons.Info}\tseed, export, audit, delete-property, delete-item",
 		$"  pits seed <PitName> --source <file>",
-		$"  pits export (<PitName> | --wwwa) (--out-dir <dir> | --json)",
+		$"  pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [--at <ISO-8601 timestamp>]",
 		$"  pits audit <PitName> [--machine <all|local|name>] [--level <severity>] [--json]",
 		$"  pits delete-property <PitName> <ItemId> <PropertyPath>",
 		$"  pits delete-item <PitName> <ItemId>",
@@ -68,6 +70,7 @@ public static class Messages
 		$"-s, --source\t{Icons.File}\t{SourceDescription()}",
 		$"-e, --export\t{Icons.Download}\t{ExportDescription()}",
 		$"--json\t\t{(Json ? Icons.Success : Icons.NotAvailable)}\texport to stdout (for piping to jq, grep, etc.)",
+		$"--at\t\t{Icons.Info}\tproject export history at an offset-explicit ISO-8601 timestamp",
 		$"--wwwa\t\t{(Wwwa ? Icons.Success : Icons.NotAvailable)}\toperate on all 4 pits (Person, Object, Place, Activity)",
 		$"--retain-window\t{Icons.Info}\tkeep this CLI process activity window until its normal timeout",
 		$"{Icons.Warning} Legacy\t{Icons.Info}\tflat seed/export flags remain supported in 4.x; use command syntax before 5.x",
@@ -269,6 +272,13 @@ internal static class Program
 			var pitRootParam = ParamValue(args, "-r", "--pitroot");
 			var sourceParam = Messages.Source = ParamValue(args, "-s", "--source");
 			var exportParam = Messages.Export = ParamValue(args, "-e", "--export");
+			var atParam = ParamValue(args, "--at");
+			if (HasOption(args, "--at") && string.IsNullOrWhiteSpace(atParam))
+			{
+				Messages.WriteError("--at requires a value with explicit Z or numeric UTC offset.");
+				return 1;
+			}
+			var at = atParam is null ? (DateTimeOffset?)null : ParseProjectionTimestamp(atParam);
 			var pitName = Messages.PitName = PositionalArg(args);
 			#endregion
 			#region RESOLVE PITROOT
@@ -305,6 +315,11 @@ internal static class Program
 			// create a process flag, acquire master authority, or write an audit event.
 			if (events)
 			{
+				if (at is not null)
+				{
+					Messages.WriteError("--at applies only to export.");
+					return 1;
+				}
 				if (wwwa && !string.IsNullOrWhiteSpace(pitName))
 				{
 					Messages.WriteError("Audit accepts either one positional pit name or --wwwa, not both.");
@@ -333,6 +348,11 @@ internal static class Program
 			// WWWA seed mode: -s sourceDir --wwwa -r pitroot
 			if (wwwa && !string.IsNullOrWhiteSpace(sourceParam) && !sourceParam.EndsWith(".pit", StringComparison.OrdinalIgnoreCase))
 			{
+				if (at is not null)
+				{
+					Messages.WriteError("--at applies only to export.");
+					return 1;
+				}
 				if (pitRoot == null)
 				{
 					Messages.WriteError("WWWA seed mode requires a pit root specified with -r or --pitroot.");
@@ -373,6 +393,11 @@ internal static class Program
 			// Single seed: -s Person.json5 -r pitroot
 			else if (!string.IsNullOrWhiteSpace(sourceParam) && pitRoot != null && !sourceParam.EndsWith(".pit", StringComparison.OrdinalIgnoreCase))
 			{
+				if (at is not null)
+				{
+					Messages.WriteError("--at applies only to export.");
+					return 1;
+				}
 				hasExecutionIntent = true;
 			}
 			// Single export via -s pointing to a .pit file
@@ -392,6 +417,7 @@ internal static class Program
 				Messages.WriteDebug($"Export: {exportParam}");
 				Messages.WriteDebug($"Json: {json}");
 				Messages.WriteDebug($"WWWA: {wwwa}");
+				Messages.WriteDebug($"At: {at:O}");
 			}
 			if (showHelp || !hasExecutionIntent)
 			{
@@ -410,34 +436,34 @@ internal static class Program
 			if (wwwa && !string.IsNullOrWhiteSpace(exportParam))
 			{
 				var exportPath = new RaiPath(exportParam);
-				return ExportWwwa(pitRoot!, exportPath);
+				return ExportWwwa(pitRoot!, exportPath, at);
 			}
 			// WWWA export to stdout
 			if (wwwa && json)
 			{
-				return ExportWwwaToStdout(pitRoot!);
+				return ExportWwwaToStdout(pitRoot!, at);
 			}
 			// Single pit export to stdout via positional name
 			if (!string.IsNullOrWhiteSpace(pitName) && json)
 			{
 				var pitFile = new PitFile(pitRoot! / pitName, pitName);
-				return ExportPitToStdout(pitFile);
+				return ExportPitToStdout(pitFile, at);
 			}
 			// Single pit export to file via positional name
 			if (!string.IsNullOrWhiteSpace(pitName) && !string.IsNullOrWhiteSpace(exportParam))
 			{
 				var pitFile = new PitFile(pitRoot! / pitName, pitName);
 				var exportPath = new RaiPath(exportParam);
-				return ExportPitToFile(pitFile, exportPath);
+				return ExportPitToFile(pitFile, exportPath, at);
 			}
 			// Single pit export via -s (pointing to .pit file)
 			if (!string.IsNullOrWhiteSpace(sourceParam) && sourceParam.EndsWith(".pit", StringComparison.OrdinalIgnoreCase))
 			{
 				var pitFile = new PitFile(sourceParam);
 				if (json)
-					return ExportPitToStdout(pitFile);
+					return ExportPitToStdout(pitFile, at);
 				if (!string.IsNullOrWhiteSpace(exportParam))
-					return ExportPitToFile(pitFile, new RaiPath(exportParam));
+					return ExportPitToFile(pitFile, new RaiPath(exportParam), at);
 			}
 			// Single seed: -s source.json5 [PitName] -r pitroot
 			// Target pit name is the trailing positional arg if provided, else the source file name.
@@ -520,7 +546,7 @@ internal static class Program
 
 	private static int RunExportCommand(string[] args)
 	{
-		var valueOptions = GlobalValueOptions.Concat(["--out-dir"]).ToHashSet(StringComparer.Ordinal);
+		var valueOptions = GlobalValueOptions.Concat(["--out-dir", "--at"]).ToHashSet(StringComparer.Ordinal);
 		var allowed = GlobalSwitchOptions.Concat(valueOptions).Concat(["--json", "--wwwa"]).ToHashSet(StringComparer.Ordinal);
 		var positionals = ValidateCommandTokens(args, allowed, valueOptions);
 		var wwwa = HasOption(args, "--wwwa");
@@ -753,8 +779,9 @@ internal static class Program
 			},
 			"export" => new[]
 			{
-				"Usage: pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [global options]",
-				"Exports one pit or a resolved WWWA projection to files or standard output."
+				"Usage: pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [--at <ISO-8601 timestamp>] [global options]",
+				"Exports one pit or a resolved WWWA projection to files or standard output.",
+				"--at requires Z or a numeric UTC offset and emits the CR017 _export/data envelope."
 			},
 			"audit" => new[]
 			{
@@ -778,7 +805,7 @@ internal static class Program
 		Messages.WriteInfo("Global options: -r|--pitroot, -c|--cloud, -b|--debug, -n|--nologo, --retain-window");
 	}
 	#region Helpers for argument parsing
-	private static readonly string[] SwitchesWithValues = { "-s", "--source", "-r", "--pitroot", "-e", "--export", "-c", "--cloudprovider", "--cloud", "--event-machine", "--event-level" };
+	private static readonly string[] SwitchesWithValues = { "-s", "--source", "-r", "--pitroot", "-e", "--export", "-c", "--cloudprovider", "--cloud", "--event-machine", "--event-level", "--at" };
 	private static string? ParamValue(string[] options, params string[] aliases)
 		=> aliases.Select(a => Array.IndexOf(options, a)).Where(i => i >= 0)
 			.Select(i => i + 1 < options.Length && !options[i + 1].StartsWith("-")
@@ -787,6 +814,24 @@ internal static class Program
 			.FirstOrDefault();
 	private static bool HasOption(string[] options, params string[] aliases)
 		=> aliases.Any(options.Contains);
+	private static readonly Regex ProjectionTimestampPattern = new(
+		@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?(?:Z|[+-]\d{2}:\d{2})$",
+		RegexOptions.CultureInvariant);
+	internal static DateTimeOffset ParseProjectionTimestamp(string value)
+	{
+		var candidate = value?.Trim();
+		if (string.IsNullOrWhiteSpace(candidate) ||
+			!ProjectionTimestampPattern.IsMatch(candidate) ||
+			!DateTimeOffset.TryParse(
+				candidate,
+				CultureInfo.InvariantCulture,
+				DateTimeStyles.None,
+				out var timestamp))
+			throw new ArgumentException(
+				"--at requires an ISO-8601 timestamp with explicit Z or numeric offset, " +
+				"for example 2026-08-27T12:00:00Z or 2026-08-27T14:00:00+02:00.");
+		return timestamp.ToUniversalTime();
+	}
 	/// <summary>
 	/// Finds the first positional argument (not a switch, not a value of a switch).
 	/// </summary>
@@ -892,7 +937,7 @@ internal static class Program
 	}
 	#endregion
 	#region Export Methods
-	private static int ExportPitToFile(PitFile pitFile, RaiPath exportPath)
+	private static int ExportPitToFile(PitFile pitFile, RaiPath exportPath, DateTimeOffset? at = null)
 	{
 		if (!pitFile.Exists())
 		{
@@ -904,8 +949,11 @@ internal static class Program
 		try
 		{
 			exportPath.mkdir();
-			pit.ExportJson(exportPath);
 			var exportFile = new RaiFile(exportPath, pit.JsonFile.Name, "json");
+			if (at is null)
+				pit.ExportJson(exportFile);
+			else
+				WriteJson(exportFile, CreatePointInTimeEnvelope(ProjectPit(pit, at), at.Value));
 			Messages.WriteSuccess($"{Icons.Success} Exported {pit.JsonFile.Name} to {exportFile.FullName}");
 			return 0;
 		}
@@ -914,7 +962,7 @@ internal static class Program
 			ReleaseProcessWindow(pit);
 		}
 	}
-	private static int ExportPitToStdout(PitFile pitFile)
+	private static int ExportPitToStdout(PitFile pitFile, DateTimeOffset? at = null)
 	{
 		if (!pitFile.Exists())
 		{
@@ -924,13 +972,9 @@ internal static class Program
 		var pit = TrackPit(new Pit(pitFile, subscriber: CliSubscriber, readOnly: true));
 		try
 		{
-			var items = new JArray();
-			foreach (var key in pit.Keys)
-			{
-				var item = pit[key];
-				if (item is not null) items.Add(item);
-			}
-			Console.WriteLine(items.ToString(Formatting.Indented));
+			var items = ProjectPit(pit, at);
+			JToken document = at is null ? items : CreatePointInTimeEnvelope(items, at.Value);
+			Console.WriteLine(document.ToString(Formatting.Indented));
 			return 0;
 		}
 		finally
@@ -938,34 +982,65 @@ internal static class Program
 			ReleaseProcessWindow(pit);
 		}
 	}
-	private static int ExportWwwa(RaiPath pitRoot, RaiPath exportPath)
+	private static int ExportWwwa(RaiPath pitRoot, RaiPath exportPath, DateTimeOffset? at = null)
 	{
-		var resolved = BuildResolvedWwwa(pitRoot);
+		var resolved = BuildResolvedWwwa(pitRoot, at);
 		if (resolved == null) return 1;
 		exportPath.mkdir();
 		var exportFile = new RaiFile(exportPath, "wwwa", "json");
-		var textFile = new TextFile(exportFile.FullName)
-		{
-			Lines = [resolved.ToString(Formatting.Indented)],
-			Changed = true
-		};
-		textFile.Save();
+		var document = at is null ? resolved : CreatePointInTimeEnvelope(resolved, at.Value);
+		WriteJson(exportFile, document);
 		Messages.WriteSuccess($"{Icons.Success} Exported resolved WWWA to {exportFile.FullName}");
 		return 0;
 	}
-	private static int ExportWwwaToStdout(RaiPath pitRoot)
+	private static int ExportWwwaToStdout(RaiPath pitRoot, DateTimeOffset? at = null)
 	{
-		var resolved = BuildResolvedWwwa(pitRoot);
+		var resolved = BuildResolvedWwwa(pitRoot, at);
 		if (resolved == null) return 1;
-		Console.WriteLine(resolved.ToString(Formatting.Indented));
+		var document = at is null ? resolved : CreatePointInTimeEnvelope(resolved, at.Value);
+		Console.WriteLine(document.ToString(Formatting.Indented));
 		return 0;
+	}
+	private static JArray ProjectPit(Pit pit, DateTimeOffset? at)
+	{
+		var items = new JArray();
+		foreach (var key in pit.Keys)
+		{
+			var item = at is null ? pit[key] : pit.GetAt(key, at.Value, withDeleted: false);
+			if (item is not null)
+				items.Add(item);
+		}
+		return items;
+	}
+	private static JObject CreatePointInTimeEnvelope(JToken data, DateTimeOffset at)
+	{
+		ArgumentNullException.ThrowIfNull(data);
+		var exported = DateTimeOffset.UtcNow;
+		return new JObject
+		{
+			["_export"] = new JObject
+			{
+				["at"] = at.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
+				["exported"] = exported.UtcDateTime.ToString("O", CultureInfo.InvariantCulture)
+			},
+			["data"] = data
+		};
+	}
+	private static void WriteJson(RaiFile exportFile, JToken document)
+	{
+		var textFile = new TextFile(exportFile.FullName)
+		{
+			Lines = [document.ToString(Formatting.Indented)],
+			Changed = true
+		};
+		textFile.Save();
 	}
 	/// <summary>
 	/// Builds the resolved WWWA export: loads all 4 pits, exports their items,
 	/// and resolves one level of foreign key references (Who/What/Where/Activity).
 	/// Resolved wrappers dissolve; unresolved wrappers remain.
 	/// </summary>
-	private static JObject? BuildResolvedWwwa(RaiPath pitRoot)
+	private static JObject? BuildResolvedWwwa(RaiPath pitRoot, DateTimeOffset? at = null)
 	{
 		var pits = new Dictionary<string, Pit>();
 		try
@@ -985,7 +1060,7 @@ internal static class Program
 				var lookup = new Dictionary<string, JObject>(StringComparer.Ordinal);
 				foreach (var key in pit.Keys)
 				{
-					var item = pit[key];
+					var item = at is null ? pit[key] : pit.GetAt(key, at.Value, withDeleted: false);
 					if (item is JObject obj)
 						lookup[key] = obj;
 				}
@@ -998,7 +1073,9 @@ internal static class Program
 				var items = new JArray();
 				foreach (var key in pits[name].Keys)
 				{
-					var item = pits[name][key];
+					var item = at is null
+						? pits[name][key]
+						: pits[name].GetAt(key, at.Value, withDeleted: false);
 					if (item is JObject obj)
 						items.Add(ResolveWwwaReferences(obj, lookups));
 					else if (item is not null)
