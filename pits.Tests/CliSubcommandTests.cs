@@ -172,7 +172,7 @@ public sealed class CliSubcommandTests : IDisposable
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.2.5", run.output.Trim());
+		Assert.Equal("pits v4.2.6", run.output.Trim());
 	}
 
 	private void CreatePit()

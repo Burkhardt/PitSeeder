@@ -19,6 +19,13 @@ PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https:
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
+## 4.2.6
+
+- Aligns PitSeeder with the coordinated seven-package RAIkeep 4.2.6 release implementing accepted CR019.
+- Aligns fallback dependencies on `JsonPit 4.2.6` and `OsLibCore 4.2.6`; `pits` behavior is unchanged.
+- Reports `pits v4.2.6` through the CLI version boundary.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.6.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.6.md)
+
 ## 4.2.5
 
 - Implements accepted CR017 with optional `--at <timestamp>` on single-pit and WWWA exports, for both `--json` and `--out-dir`.
