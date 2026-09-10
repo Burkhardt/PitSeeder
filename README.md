@@ -19,6 +19,14 @@ PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https:
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
+## 4.2.8
+
+- Implements accepted CR021 `pits maintain (<PitName> | --wwwa)` with report-only default and explicit `--apply`.
+- Adds machine-readable `--json` reporting, explicit aged process-window pruning, and explicit validated extensionless flag/event repair.
+- Maintenance disposal does not republish retired changes.
+- Aligns fallback dependencies on `JsonPit 4.2.8` and `OsLibCore 4.2.8`, and reports `pits v4.2.8`.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.8.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.8.md)
+
 ## 4.2.7
 
 - Aligns PitSeeder with the coordinated seven-package RAIkeep 4.2.7 release implementing accepted CR020.
@@ -100,6 +108,8 @@ pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [--at <timestamp>] [
 pits audit (<PitName> | --wwwa) [--machine <filter>] [--level <severity>] [--json] [global options]
 pits delete-property <PitName> <ItemId> <PropertyPath> [global options]
 pits delete-item <PitName> <ItemId> [global options]
+pits maintain (<PitName> | --wwwa) [--apply] [--json] [global options]
+  [--prune-process-flags --older-than <duration>] [--repair-legacy-extensions]
 ```
 
 | Global option | Description |
@@ -113,8 +123,26 @@ pits delete-item <PitName> <ItemId> [global options]
 | `--retain-window` | Keep this CLI process activity window until the normal timeout instead of releasing it on exit |
 
 `--source` belongs to `seed`; `--out-dir` and `--at` belong to `export`; `--machine` and
-`--level` belong to `audit`. `--json` is available on `export` and `audit`.
+`--level` belong to `audit`. `--json` is available on `export`, `audit`, and `maintain`.
 Run `pits <command> --help` for contextual help.
+
+### Maintain a pit
+
+`maintain` is report-only unless `--apply` is present:
+
+```bash
+pits maintain Activity -r /path/to/pitroot --json
+pits maintain Activity -r /path/to/pitroot --apply
+pits maintain --wwwa -r /path/to/pitroot --apply
+```
+
+Ordinary apply reconciles valid changes, creates or preserves immutable cleanup
+receipts, and retires eligible pairs only after the grace and authority checks.
+Removing proven expired PID-specific process windows additionally requires
+`--prune-process-flags --older-than <duration>`. Repairing recognizable,
+content-valid extensionless process flags or recovery events additionally requires
+`--repair-legacy-extensions`. Unknown, malformed, live, master, and conflict files
+are retained.
 
 ### Delete a nested property or item
 

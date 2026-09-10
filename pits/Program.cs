@@ -55,12 +55,13 @@ public static class Messages
 	public static bool Events { get; set; }
 	public static string[] Help =>
 	[
-		$"Commands:\t{Icons.Info}\tseed, export, audit, delete-property, delete-item",
+		$"Commands:\t{Icons.Info}\tseed, export, audit, delete-property, delete-item, maintain",
 		$"  pits seed <PitName> --source <file>",
 		$"  pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [--at <ISO-8601 timestamp>]",
 		$"  pits audit <PitName> [--machine <all|local|name>] [--level <severity>] [--json]",
 		$"  pits delete-property <PitName> <ItemId> <PropertyPath>",
 		$"  pits delete-item <PitName> <ItemId>",
+		$"  pits maintain (<PitName> | --wwwa) [--apply] [--json]",
 		$"-h, --help\t{Icons.Help}\tprint out all options",
 		$"-v, --version\t{Icons.Info}\tprint version info",
 		$"-n, --nologo\t{(Banner ? Icons.Banner : Icons.NoBanner)}\tdo not display the banner",
@@ -233,7 +234,7 @@ internal static class Program
 		if (args.Length > 0)
 		{
 			var command = args[0];
-			if (command is "seed" or "export" or "audit" or "delete-property" or "delete-item")
+			if (command is "seed" or "export" or "audit" or "delete-property" or "delete-item" or "maintain")
 				return RunCommand(command, args[1..]);
 		}
 
@@ -510,6 +511,7 @@ internal static class Program
 				"audit" => RunAuditCommand(args),
 				"delete-property" => RunDeletePropertyCommand(args),
 				"delete-item" => RunDeleteItemCommand(args),
+				"maintain" => RunMaintainCommand(args),
 				_ => throw new ArgumentException($"Unknown command '{command}'.")
 			};
 		}
@@ -600,6 +602,124 @@ internal static class Program
 		if (positionals.Count != 2)
 			throw new ArgumentException("delete-item requires exactly <PitName> <ItemId>.");
 		return RunDeleteMutation(args, positionals[0], positionals[1], propertyPath: null);
+	}
+
+	private static int RunMaintainCommand(string[] args)
+	{
+		var valueOptions = GlobalValueOptions.Concat(["--older-than"]).ToHashSet(StringComparer.Ordinal);
+		var allowed = GlobalSwitchOptions.Concat(valueOptions).Concat([
+			"--wwwa", "--apply", "--json", "--prune-process-flags", "--repair-legacy-extensions"
+		]).ToHashSet(StringComparer.Ordinal);
+		var positionals = ValidateCommandTokens(args, allowed, valueOptions);
+		var wwwa = HasOption(args, "--wwwa");
+		var apply = HasOption(args, "--apply");
+		var json = HasOption(args, "--json");
+		var prune = HasOption(args, "--prune-process-flags");
+		var repair = HasOption(args, "--repair-legacy-extensions");
+		var olderThanText = ParamValue(args, "--older-than");
+
+		if (wwwa && positionals.Count > 0)
+			throw new ArgumentException("maintain accepts either <PitName> or --wwwa, not both.");
+		if (!wwwa && positionals.Count != 1)
+			throw new ArgumentException("maintain requires exactly one <PitName>, or --wwwa.");
+		if (prune && !apply)
+			throw new ArgumentException("--prune-process-flags requires --apply.");
+		if (prune && string.IsNullOrWhiteSpace(olderThanText))
+			throw new ArgumentException("--prune-process-flags requires --older-than <duration>.");
+		if (!prune && olderThanText is not null)
+			throw new ArgumentException("--older-than applies only with --prune-process-flags.");
+		if (repair && !apply)
+			throw new ArgumentException("--repair-legacy-extensions requires --apply.");
+		TimeSpan? olderThan = null;
+		if (olderThanText is not null)
+		{
+			if (!TimeSpan.TryParse(olderThanText, CultureInfo.InvariantCulture, out var parsed) || parsed <= TimeSpan.Zero)
+				throw new ArgumentException("--older-than requires a positive TimeSpan, for example 7.00:00:00.");
+			olderThan = parsed;
+		}
+
+		Messages.Debug = HasOption(args, "-b", "--debug");
+		Messages.Banner = !json && !HasOption(args, "-n", "--nologo");
+		Messages.RetainWindow = HasOption(args, "--retain-window");
+		var root = ResolveCommandPitRoot(args, wwwa ? "WWWA" : positionals[0]);
+		Messages.PitRoot = root;
+		Messages.Wwwa = wwwa;
+		if (Messages.Banner) Messages.WriteBanner($"{Icons.Info} AfricaStage Pit Seeder CLI");
+
+		var options = new PitMaintenanceOptions
+		{
+			Apply = apply,
+			PruneProcessFlags = prune,
+			OlderThan = olderThan,
+			RepairLegacyExtensions = repair
+		};
+		var names = wwwa ? Messages.WwwaFiles : [positionals[0]];
+		var results = new List<PitMaintenanceResult>();
+		foreach (var name in names)
+		{
+			var pitPath = root / name;
+			var pit = TrackPit(new Pit(
+				pitPath,
+				subscriber: CliSubscriber,
+				readOnly: !apply,
+				undercover: true,
+				autoload: false));
+			try
+			{
+				if (pit.JsonFile.Exists()) pit.Load(undercover: true);
+				results.Add(pit.Maintain(options));
+			}
+			finally
+			{
+				// Maintenance itself creates no new domain mutation. Suppress the normal
+				// disposal recovery publication so cleanup cannot recreate retired changes.
+				pit.ReadOnly = true;
+				ReleaseProcessWindow(pit);
+			}
+		}
+
+		if (json)
+		{
+			JToken document = wwwa
+				? new JArray(results.Select(JObject.FromObject))
+				: JObject.FromObject(results[0]);
+			Console.WriteLine(document.ToString(Formatting.Indented));
+		}
+		else
+		{
+			foreach (var result in results)
+			{
+				Messages.WriteInfo(
+					$"{result.PitFile}: changes {result.ChangeFilesObserved} observed/{result.ChangeFilesMerged} merged/{result.ChangeFilesRemoved} removed; " +
+					$"receipts {result.ReceiptsCreated} created/{result.ReceiptsRemoved} removed; " +
+					$"flags {result.ProcessFlagsActive} active/{result.ProcessFlagsExpired} expired/{result.ProcessFlagsPruned} pruned; " +
+					$"legacy {result.LegacyArtifactsObserved} observed/{result.LegacyArtifactsRepaired} repaired.");
+				foreach (var deferred in result.Deferred) Messages.WriteInfo($"Deferred: {deferred}");
+				foreach (var failure in result.Failures) Messages.WriteError($"Failed: {failure}");
+			}
+		}
+		return results.All(result => result.Succeeded) ? 0 : 1;
+	}
+
+	private static RaiPath ResolveCommandPitRoot(string[] args, string target)
+	{
+		var requestedCloudProvider = ParamValue(args, "-c", "--cloudprovider", "--cloud");
+		var cloudProvider = Messages.CloudProvider = ResolveCloudProvider(requestedCloudProvider);
+		var pitRootParam = ParamValue(args, "-r", "--pitroot");
+		if (!string.IsNullOrWhiteSpace(cloudProvider))
+		{
+			string? cloudDirectory = Os.Config?.Cloud?[cloudProvider];
+			if (string.IsNullOrWhiteSpace(cloudDirectory))
+				throw new ArgumentException(
+					$"The requested cloud provider '{cloudProvider}' is missing or empty in {Os.DefaultConfigFileLocation}.");
+			var cloudRoot = new RaiPath(cloudDirectory);
+			return !string.IsNullOrWhiteSpace(pitRootParam)
+				? cloudRoot / new RaiRelPath(pitRootParam.TrimStart('/', '\\'))
+				: cloudRoot;
+		}
+		if (!string.IsNullOrWhiteSpace(pitRootParam)) return new RaiPath(pitRootParam);
+		throw new ArgumentException(
+			$"Cannot resolve maintenance target '{target}' without -r or --pitroot, or a configured -c or --cloud provider.");
 	}
 
 	private static int RunDeleteMutation(
@@ -798,6 +918,12 @@ internal static class Program
 				"Usage: pits delete-item <PitName> <ItemId> [global options]",
 				"Appends an item tombstone so projected reads and exports omit the item."
 			},
+			"maintain" => new[]
+			{
+				"Usage: pits maintain (<PitName> | --wwwa) [--apply] [--json] [global options]",
+				"       [--prune-process-flags --older-than <duration>] [--repair-legacy-extensions]",
+				"Reports restart-safe change/receipt cleanup; --apply performs only explicitly authorized maintenance."
+			},
 			_ => Array.Empty<string>()
 		};
 		foreach (var line in lines)
@@ -805,7 +931,7 @@ internal static class Program
 		Messages.WriteInfo("Global options: -r|--pitroot, -c|--cloud, -b|--debug, -n|--nologo, --retain-window");
 	}
 	#region Helpers for argument parsing
-	private static readonly string[] SwitchesWithValues = { "-s", "--source", "-r", "--pitroot", "-e", "--export", "-c", "--cloudprovider", "--cloud", "--event-machine", "--event-level", "--at" };
+	private static readonly string[] SwitchesWithValues = { "-s", "--source", "-r", "--pitroot", "-e", "--export", "-c", "--cloudprovider", "--cloud", "--event-machine", "--event-level", "--at", "--older-than" };
 	private static string? ParamValue(string[] options, params string[] aliases)
 		=> aliases.Select(a => Array.IndexOf(options, a)).Where(i => i >= 0)
 			.Select(i => i + 1 < options.Length && !options[i + 1].StartsWith("-")

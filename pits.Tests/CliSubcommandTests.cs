@@ -88,6 +88,60 @@ public sealed class CliSubcommandTests : IDisposable
 	}
 
 	[Fact]
+	public void Maintain_ReportOnlyThenApply_UsesDurableReceiptWithoutRepublishingChanges()
+	{
+		var pitPath = (root / "Activity").mkdir();
+		RaiFile change;
+		using (var pit = new JsonPit.Pit(pitPath, readOnly: false, unflagged: true, autoload: false))
+		{
+			pit.Add(new JsonPit.PitItem("Canonical"));
+			pit.Save(force: true);
+			change = pit.CreateChangeFile(new JsonPit.PitItem("Remote"), "RemotePeer-app-4242");
+			pit.Maintain(apply: true);
+		}
+		var receiptPath = JsonPit.ReceiptFile.PathFor(change.FullName);
+		var oldReceipt = new TextFile(receiptPath.FullName)
+		{
+			Lines = [DateTimeOffset.UtcNow.Subtract(TimeSpan.FromHours(1)).UtcDateTime.ToString("o")],
+			Changed = true
+		};
+		oldReceipt.Save();
+
+		var report = RunPits("maintain", "Activity", "--json", "-r", root.FullPath);
+		Assert.Equal(0, report.exitCode);
+		var reportJson = JObject.Parse(report.output);
+		Assert.True((int?)reportJson["ChangeFilesEligible"] >= 1);
+		Assert.True(change.Exists());
+		Assert.True(receiptPath.Exists());
+
+		var apply = RunPits("maintain", "Activity", "--apply", "--json", "-r", root.FullPath);
+		Assert.Equal(0, apply.exitCode);
+		var applyJson = JObject.Parse(apply.output);
+		Assert.Equal(1, (int?)applyJson["ChangeFilesRemoved"]);
+		Assert.False(change.Exists());
+		Assert.False(receiptPath.Exists());
+		Assert.Empty(pitPath.EnumerateFiles("*.json"));
+	}
+
+	[Fact]
+	public void Maintain_ValidatesExplicitDestructiveOptions_AndWwwaReportsFourPits()
+	{
+		Assert.Equal(1, RunPits(
+			"maintain", "Activity", "--prune-process-flags", "--older-than", "7.00:00:00",
+			"-r", root.FullPath, "-n").exitCode);
+		Assert.Equal(1, RunPits(
+			"maintain", "Activity", "--apply", "--older-than", "7.00:00:00",
+			"-r", root.FullPath, "-n").exitCode);
+		Assert.Equal(1, RunPits(
+			"maintain", "Activity", "--repair-legacy-extensions",
+			"-r", root.FullPath, "-n").exitCode);
+
+		var wwwa = RunPits("maintain", "--wwwa", "--json", "-r", root.FullPath);
+		Assert.Equal(0, wwwa.exitCode);
+		Assert.Equal(4, JArray.Parse(wwwa.output).Count);
+	}
+
+	[Fact]
 	public void LegacyExport_RemainsAvailableAlongsideCommandSyntax()
 	{
 		CreatePit();
@@ -130,7 +184,7 @@ public sealed class CliSubcommandTests : IDisposable
 		var rootHelp = RunPits("--help");
 		Assert.Equal(0, rootHelp.exitCode);
 		Assert.DoesNotContain("===", rootHelp.output, StringComparison.Ordinal);
-		Assert.Contains("seed, export, audit, delete-property, delete-item", rootHelp.output, StringComparison.OrdinalIgnoreCase);
+		Assert.Contains("seed, export, audit, delete-property, delete-item, maintain", rootHelp.output, StringComparison.OrdinalIgnoreCase);
 		Assert.Contains("(default)", rootHelp.output);
 		Assert.DoesNotContain(" PitRoot", rootHelp.output);
 		Assert.DoesNotContain("①", rootHelp.output, StringComparison.Ordinal);
@@ -172,7 +226,7 @@ public sealed class CliSubcommandTests : IDisposable
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.2.7", run.output.Trim());
+		Assert.Equal("pits v4.2.8", run.output.Trim());
 	}
 
 	private void CreatePit()
