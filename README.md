@@ -21,6 +21,15 @@ Operational recovery-log guidance: [`PITS-AUDIT.md`](https://github.com/Burkhard
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
+## 4.2.10
+
+- Adds `--archive-events` to `pits maintain` for explicit preview/apply compaction of loose recovery events.
+- Preview reports the exact UTC-range archive and selected files without mutation; `--apply` creates the immutable archive directly inside the existing `Events` directory and retires only validated loose copies.
+- `pits audit` transparently combines loose `.event` files and validated `Events_*.zip` archives with unchanged filters and ordering.
+- Invalid or conflicting evidence is retained and reported; existing archives are never overwritten or replaced.
+- Aligns fallback dependencies on `JsonPit 4.2.10` and `OsLibCore 4.2.10`, and reports `pits v4.2.10`.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.10.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.10.md)
+
 ## 4.2.9
 
 - Implements accepted incident corrective action CR022 with maintenance-root validation before any `Pit` is constructed.
@@ -120,7 +129,7 @@ pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [--at <timestamp>] [
 pits audit (<PitName> | --wwwa) [--machine <filter>] [--level <severity>] [--json] [global options]
 pits delete-property <PitName> <ItemId> <PropertyPath> [global options]
 pits delete-item <PitName> <ItemId> [global options]
-pits maintain (<PitName> | --wwwa) [--apply] [--json] [global options]
+pits maintain (<PitName> | --wwwa) [--apply] [--archive-events] [--json] [global options]
   [--prune-process-flags --older-than <duration>] [--repair-legacy-extensions]
 ```
 
@@ -184,7 +193,33 @@ Process-flag pruning remains deliberately explicit and is never performed merely
 because a master opens a pit. `--prune-process-flags` currently requires
 `--apply`; ordinary report-only maintenance inventories active, released, and
 naturally expired flags, but does not preview the exact prune/defer decision.
-Recovery events are durable audit records and are not deleted by `maintain`.
+Recovery events are durable audit records and are not deleted by ordinary
+`maintain`. Their physical compaction is separately requested with
+`--archive-events`.
+
+Preview one pit’s event compaction without writing or deleting anything:
+
+```bash
+pits maintain Object -c OneDrive -r AIA --archive-events --json
+```
+
+Apply it, or compact all existing WWWA pits:
+
+```bash
+pits maintain Object -c OneDrive -r AIA \
+  --apply --archive-events --json
+
+pits maintain --wwwa -c OneDrive -r AIA \
+  --apply --archive-events --json
+```
+
+The archive is named from the oldest and newest validated event timestamps in
+UTC, such as `Events_20260804-0118_to_20260910-1643.zip`. It is created directly
+inside the existing pit `Events` directory. There is no TempDir staging,
+directory replacement, archive overwrite, or extraction. Loose files are
+removed individually only after the archive validates their exact filenames and
+bytes. Corrupt files, collisions, and evidence that changes during the operation
+are retained and reported in `Deferred` or `Failures`.
 
 ### Delete a nested property or item
 
@@ -213,10 +248,12 @@ matching is case-insensitive and the configured spelling is retained.
 ## Events audit mode
 
 `pits audit <PitName> -r <root>` reads the pit's durable recovery events from its
-`Events` child directory. It is strictly read-only: it opens no `Pit`, creates no
+`Events` child directory and its immutable `Events_*.zip` archives. It is strictly read-only: it opens no `Pit`, creates no
 process or master flag, merges nothing, and writes no audit event. With `--json` it
 emits the filtered events as a JSON array; otherwise output is human-readable and
-ordered deterministically by machine, UTC time, and event identity.
+ordered deterministically by machine, UTC time, and event identity. Duplicate
+loose/archive copies are emitted once; conflicting identities cause a diagnostic
+and a nonzero command result without deleting either source.
 
 For stage meanings, severity behavior, incident workflows, JSON fields, and
 practical `jq` reports, read the full

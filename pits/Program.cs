@@ -61,7 +61,7 @@ public static class Messages
 		$"  pits audit <PitName> [--machine <all|local|name>] [--level <severity>] [--json]",
 		$"  pits delete-property <PitName> <ItemId> <PropertyPath>",
 		$"  pits delete-item <PitName> <ItemId>",
-		$"  pits maintain (<PitName> | --wwwa) [--apply] [--json]",
+		$"  pits maintain (<PitName> | --wwwa) [--apply] [--archive-events] [--json]",
 		$"-h, --help\t{Icons.Help}\tprint out all options",
 		$"-v, --version\t{Icons.Info}\tprint version info",
 		$"-n, --nologo\t{(Banner ? Icons.Banner : Icons.NoBanner)}\tdo not display the banner",
@@ -608,7 +608,7 @@ internal static class Program
 	{
 		var valueOptions = GlobalValueOptions.Concat(["--older-than"]).ToHashSet(StringComparer.Ordinal);
 		var allowed = GlobalSwitchOptions.Concat(valueOptions).Concat([
-			"--wwwa", "--apply", "--json", "--prune-process-flags", "--repair-legacy-extensions"
+			"--wwwa", "--apply", "--json", "--prune-process-flags", "--repair-legacy-extensions", "--archive-events"
 		]).ToHashSet(StringComparer.Ordinal);
 		var positionals = ValidateCommandTokens(args, allowed, valueOptions);
 		var wwwa = HasOption(args, "--wwwa");
@@ -616,6 +616,7 @@ internal static class Program
 		var json = HasOption(args, "--json");
 		var prune = HasOption(args, "--prune-process-flags");
 		var repair = HasOption(args, "--repair-legacy-extensions");
+		var archiveEvents = HasOption(args, "--archive-events");
 		var olderThanText = ParamValue(args, "--older-than");
 
 		if (wwwa && positionals.Count > 0)
@@ -651,7 +652,8 @@ internal static class Program
 			Apply = apply,
 			PruneProcessFlags = prune,
 			OlderThan = olderThan,
-			RepairLegacyExtensions = repair
+			RepairLegacyExtensions = repair,
+			ArchiveEvents = archiveEvents
 		};
 		var names = wwwa ? Messages.WwwaFiles : [positionals[0]];
 		if (!root.Exists())
@@ -719,7 +721,9 @@ internal static class Program
 					$"{result.PitFile}: changes {result.ChangeFilesObserved} observed/{result.ChangeFilesMerged} merged/{result.ChangeFilesRemoved} removed; " +
 					$"receipts {result.ReceiptsCreated} created/{result.ReceiptsRemoved} removed; " +
 					$"flags {result.ProcessFlagsActive} active/{result.ProcessFlagsExpired} expired/{result.ProcessFlagsPruned} pruned; " +
-					$"legacy {result.LegacyArtifactsObserved} observed/{result.LegacyArtifactsRepaired} repaired.");
+					$"legacy {result.LegacyArtifactsObserved} observed/{result.LegacyArtifactsRepaired} repaired; " +
+					$"events {result.EventFilesObserved} observed/{result.EventFilesArchived} archived/{result.EventFilesRemoved} removed" +
+					(string.IsNullOrWhiteSpace(result.EventArchiveName) ? "." : $" as {result.EventArchiveName}."));
 				foreach (var deferred in result.Deferred) Messages.WriteInfo($"Deferred: {deferred}");
 				foreach (var failure in result.Failures) Messages.WriteError($"Failed: {failure}");
 			}
@@ -946,8 +950,9 @@ internal static class Program
 			},
 			"maintain" => new[]
 			{
-				"Usage: pits maintain (<PitName> | --wwwa) [--apply] [--json] [global options]",
+				"Usage: pits maintain (<PitName> | --wwwa) [--apply] [--archive-events] [--json] [global options]",
 				"       [--prune-process-flags --older-than <duration>] [--repair-legacy-extensions]",
+				"--archive-events previews the immutable same-directory archive; add --apply to create it and retire validated loose copies.",
 				"Reports restart-safe change/receipt cleanup; --apply performs only explicitly authorized maintenance."
 			},
 			_ => Array.Empty<string>()
@@ -1024,26 +1029,35 @@ internal static class Program
 	private static int ShowEvents(IEnumerable<RaiPath> pitDirectories, string machineFilter, LogLevel minLevel, bool json)
 	{
 		var directories = pitDirectories.ToList();
-		var events = directories
-			.SelectMany(directory => PitAudit.Read(directory, machineFilter, minLevel))
+		var reads = directories
+			.Select(directory => new { Directory = directory, Result = PitAudit.Inspect(directory, machineFilter, minLevel) })
+			.ToList();
+		var events = reads
+			.SelectMany(read => read.Result.Events)
 			.OrderBy(e => e.Machine, StringComparer.Ordinal)
 			.ThenBy(e => e.UtcTime)
 			.ThenBy(e => e.EventId, StringComparer.Ordinal)
+			.ToList();
+		var issues = reads
+			.SelectMany(read => read.Result.Issues.Select(issue => $"{read.Directory.FullPath}: {issue}"))
 			.ToList();
 		if (json)
 		{
 			var array = new JArray(events.Select(e => e.Content));
 			Console.WriteLine(array.ToString(Formatting.Indented));
-			return 0;
+			foreach (var issue in issues) Console.Error.WriteLine($"Audit warning: {issue}");
+			return issues.Count == 0 ? 0 : 1;
 		}
 		if (events.Count == 0)
 		{
 			Messages.WriteInfo($"No matching events under {string.Join(", ", directories.Select(directory => directory.FullPath + OsLib.EventDirectory.Name))}.");
-			return 0;
+			foreach (var issue in issues) Messages.WriteError($"Audit warning: {issue}");
+			return issues.Count == 0 ? 0 : 1;
 		}
 		foreach (var e in events)
 			Console.WriteLine($"{e.Machine}\t{e.UtcTime:o}\t{e.Level}\t{e.Stage}\t{e.Message}\t({e.FileName})");
-		return 0;
+		foreach (var issue in issues) Messages.WriteError($"Audit warning: {issue}");
+		return issues.Count == 0 ? 0 : 1;
 	}
 	#endregion
 	#region Seeding Methods

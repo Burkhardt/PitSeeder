@@ -1,5 +1,6 @@
 using Newtonsoft.Json.Linq;
 using OsLib;
+using Microsoft.Extensions.Logging;
 
 namespace PitSeeder.Tests;
 
@@ -121,6 +122,76 @@ public sealed class CliSubcommandTests : IDisposable
 		Assert.False(change.Exists());
 		Assert.False(receiptPath.Exists());
 		Assert.Empty(pitPath.EnumerateFiles("*.json"));
+	}
+
+	[Fact]
+	public void Maintain_ArchiveEvents_PreviewsThenApplies_AndAuditReadsTheArchive()
+	{
+		var pitPath = (root / "Activity").mkdir();
+		using (var pit = new JsonPit.Pit(pitPath, readOnly: false, unflagged: true, autoload: false))
+		{
+			pit.Add(new JsonPit.PitItem("Canonical"));
+			pit.Save(force: true);
+		}
+		var utc = new DateTimeOffset(2026, 9, 10, 14, 35, 0, TimeSpan.Zero);
+		var loose = WriteAuditEvent(pitPath, "Activity", utc, "archivable event");
+
+		var preview = RunPits(
+			"maintain", "Activity", "--archive-events", "--json", "-r", root.FullPath, "-n");
+		Assert.Equal(0, preview.exitCode);
+		var previewJson = JObject.Parse(preview.output);
+		Assert.False((bool)previewJson["Applied"]!);
+		Assert.Equal(1, (int?)previewJson["EventFilesEligible"]);
+		Assert.Equal("Events_20260910-1435_to_20260910-1435.zip", (string?)previewJson["EventArchiveName"]);
+		Assert.True(loose.Exists());
+		Assert.Empty((pitPath / EventDirectory.Name).EnumerateFiles("*.zip"));
+
+		var apply = RunPits(
+			"maintain", "Activity", "--archive-events", "--apply", "--json", "-r", root.FullPath, "-n");
+		Assert.Equal(0, apply.exitCode);
+		var applyJson = JObject.Parse(apply.output);
+		Assert.Equal(1, (int?)applyJson["EventArchivesCreated"]);
+		Assert.Equal(1, (int?)applyJson["EventFilesRemoved"]);
+		Assert.False(loose.Exists());
+		Assert.Single((pitPath / EventDirectory.Name).EnumerateFiles("*.zip"));
+
+		var audit = RunPits("audit", "Activity", "--json", "-r", root.FullPath, "-n");
+		Assert.Equal(0, audit.exitCode);
+		var events = JArray.Parse(audit.output[audit.output.IndexOf('[')..]);
+		Assert.Equal("archivable event", (string?)Assert.Single(events)["Message"]);
+	}
+
+	[Fact]
+	public void Maintain_ArchiveEvents_WwwaArchivesEachExistingPitWithoutCreatingMissingPits()
+	{
+		foreach (var name in new[] { "Activity", "Object" })
+		{
+			var pitPath = (root / name).mkdir();
+			using var pit = new JsonPit.Pit(pitPath, readOnly: false, unflagged: true, autoload: false);
+			pit.Add(new JsonPit.PitItem($"{name}Item"));
+			pit.Save(force: true);
+			WriteAuditEvent(
+				pitPath,
+				name,
+				new DateTimeOffset(2026, 9, 10, name == "Activity" ? 14 : 15, 0, 0, TimeSpan.Zero),
+				$"{name} event");
+		}
+
+		var apply = RunPits(
+			"maintain", "--wwwa", "--archive-events", "--apply", "--json", "-r", root.FullPath, "-n");
+
+		Assert.Equal(0, apply.exitCode);
+		var results = JArray.Parse(apply.output);
+		Assert.Equal(4, results.Count);
+		Assert.Equal(2, results.Count(result => (int?)result["EventArchivesCreated"] == 1));
+		Assert.False((root / "Person").Exists());
+		Assert.False((root / "Place").Exists());
+		Assert.Single((root / "Activity" / EventDirectory.Name).EnumerateFiles("*.zip"));
+		Assert.Single((root / "Object" / EventDirectory.Name).EnumerateFiles("*.zip"));
+
+		var audit = RunPits("audit", "--wwwa", "--json", "-r", root.FullPath, "-n");
+		Assert.Equal(0, audit.exitCode);
+		Assert.Equal(2, JArray.Parse(audit.output[audit.output.IndexOf('[')..]).Count);
 	}
 
 	[Fact]
@@ -269,7 +340,7 @@ public sealed class CliSubcommandTests : IDisposable
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.2.9", run.output.Trim());
+		Assert.Equal("pits v4.2.10", run.output.Trim());
 	}
 
 	private void CreatePit()
@@ -282,6 +353,35 @@ public sealed class CliSubcommandTests : IDisposable
 		source.Save();
 		var seed = RunPits("-n", "-s", source.FullName, "-r", root.FullPath, "Person");
 		Assert.Equal(0, seed.exitCode);
+	}
+
+	private static EventFile WriteAuditEvent(
+		RaiPath pitPath,
+		string pitName,
+		DateTimeOffset utc,
+		string message)
+	{
+		var status = new JsonPit.RecoveryStatus(
+			JsonPit.RecoveryStatus.CurrentSchemaVersion,
+			Guid.NewGuid(),
+			utc,
+			LogLevel.Information,
+			JsonPit.RecoveryStage.Completed,
+			pitName,
+			"TestMachine",
+			"TestMachine-tests-1",
+			string.Empty,
+			JsonPit.RecoveryRole.Master,
+			0,
+			0,
+			Guid.NewGuid(),
+			"Test",
+			message,
+			string.Empty);
+		return new EventFile(
+			pitPath,
+			$"{utc.UtcTicks}_TestMachine-tests-1_Completed",
+			status.ToJObject());
 	}
 
 	private void Cleanup()
