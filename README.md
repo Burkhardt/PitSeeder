@@ -17,6 +17,8 @@ PitSeeder uses the shared RAIkeep configured cloud-root contract: `Dropbox`, `On
 
 PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https://github.com/Burkhardt/RAIkeep) data stores. It can seed pits from JSON/JSON5 source files, export pits to JSON, and produce resolved WWWA exports where foreign key references are expanded inline.
 
+Operational recovery-log guidance: [`PITS-AUDIT.md`](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PITS-AUDIT.md).
+
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
 ## 4.2.9
@@ -215,6 +217,10 @@ matching is case-insensitive and the configured spelling is retained.
 process or master flag, merges nothing, and writes no audit event. With `--json` it
 emits the filtered events as a JSON array; otherwise output is human-readable and
 ordered deterministically by machine, UTC time, and event identity.
+
+For stage meanings, severity behavior, incident workflows, JSON fields, and
+practical `jq` reports, read the full
+[`pits audit` operational manual](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PITS-AUDIT.md).
 
 ```zsh
 pits audit Person -n -r /path/to/pitroot/ --level warning
