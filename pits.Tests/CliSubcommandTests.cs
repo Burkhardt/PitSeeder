@@ -135,10 +135,53 @@ public sealed class CliSubcommandTests : IDisposable
 		Assert.Equal(1, RunPits(
 			"maintain", "Activity", "--repair-legacy-extensions",
 			"-r", root.FullPath, "-n").exitCode);
+		var activityPath = (root / "Activity").mkdir();
+		using (var activity = new JsonPit.Pit(activityPath, readOnly: false, unflagged: true, autoload: false))
+		{
+			activity.Add(new JsonPit.PitItem("Existing"));
+			activity.Save(force: true);
+		}
 
 		var wwwa = RunPits("maintain", "--wwwa", "--json", "-r", root.FullPath);
 		Assert.Equal(0, wwwa.exitCode);
-		Assert.Equal(4, JArray.Parse(wwwa.output).Count);
+		var results = JArray.Parse(wwwa.output);
+		Assert.Equal(4, results.Count);
+		Assert.False((root / "Person").Exists());
+		Assert.False((root / "Object").Exists());
+		Assert.False((root / "Place").Exists());
+		Assert.Contains(results, result =>
+			result["Deferred"]?.Values<string>().Any(message =>
+				message?.Contains("was not created", StringComparison.Ordinal) == true) == true);
+	}
+
+	[Fact]
+	public void Maintain_WwwaWrongExistingRoot_FailsWithoutCreatingNestedPitDirectories()
+	{
+		var wrongRoot = (root / "Activity" / "AIA").mkdir();
+		var parentWriteTime = Directory.GetLastWriteTimeUtc(wrongRoot.FullPath);
+
+		var result = RunPits("maintain", "--wwwa", "--json", "-r", wrongRoot.FullPath, "-n");
+
+		Assert.Equal(1, result.exitCode);
+		Assert.Contains("contains none of the WWWA pits", result.output, StringComparison.Ordinal);
+		Assert.Equal(parentWriteTime, Directory.GetLastWriteTimeUtc(wrongRoot.FullPath));
+		foreach (var name in new[] { "Activity", "Person", "Object", "Place" })
+			Assert.False((wrongRoot / name).Exists());
+	}
+
+	[Fact]
+	public void Maintain_MissingRootAndSinglePit_FailWithoutCreatingEitherTarget()
+	{
+		var missingRoot = root / "missing-root";
+		var missingPitRoot = (root / "single-root").mkdir();
+
+		var missingRootResult = RunPits("maintain", "--wwwa", "--json", "-r", missingRoot.FullPath, "-n");
+		var missingPitResult = RunPits("maintain", "Activity", "--json", "-r", missingPitRoot.FullPath, "-n");
+
+		Assert.Equal(1, missingRootResult.exitCode);
+		Assert.Equal(1, missingPitResult.exitCode);
+		Assert.False(missingRoot.Exists());
+		Assert.False((missingPitRoot / "Activity").Exists());
 	}
 
 	[Fact]
@@ -226,7 +269,7 @@ public sealed class CliSubcommandTests : IDisposable
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.2.8", run.output.Trim());
+		Assert.Equal("pits v4.2.9", run.output.Trim());
 	}
 
 	private void CreatePit()

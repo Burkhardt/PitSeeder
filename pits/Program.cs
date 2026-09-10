@@ -654,12 +654,38 @@ internal static class Program
 			RepairLegacyExtensions = repair
 		};
 		var names = wwwa ? Messages.WwwaFiles : [positionals[0]];
+		if (!root.Exists())
+			throw new RaiPathNotFoundException(
+				$"The maintenance root does not exist: {root.FullPath}",
+				root.FullPath);
+		var targets = names
+			.Select(name => new
+			{
+				Name = name,
+				Path = root / name,
+				File = new RaiFile(root / name, name, "pit")
+			})
+			.ToList();
+		if (!wwwa && !targets[0].File.Exists())
+			throw new RaiPathNotFoundException(
+				$"The requested pit does not exist: {targets[0].File.FullName}",
+				targets[0].Path.FullPath);
+		if (wwwa && targets.All(target => !target.File.Exists()))
+			throw new RaiPathNotFoundException(
+				$"The maintenance root contains none of the WWWA pits: {root.FullPath}",
+				root.FullPath);
 		var results = new List<PitMaintenanceResult>();
-		foreach (var name in names)
+		foreach (var target in targets)
 		{
-			var pitPath = root / name;
+			if (!target.File.Exists())
+			{
+				var missing = new PitMaintenanceResult(target.File.FullName, apply);
+				missing.Deferred.Add($"Pit does not exist and was not created: {target.File.FullName}");
+				results.Add(missing);
+				continue;
+			}
 			var pit = TrackPit(new Pit(
-				pitPath,
+				target.Path,
 				subscriber: CliSubscriber,
 				readOnly: !apply,
 				undercover: true,

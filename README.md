@@ -19,6 +19,16 @@ PitSeeder (`pits`) is a .NET command-line tool for working with [JsonPit](https:
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
+## 4.2.9
+
+- Implements accepted incident corrective action CR022 with maintenance-root validation before any `Pit` is constructed.
+- Report-only and apply modes reject a missing root or a WWWA root containing no expected pits without creating directories or files.
+- Partially populated WWWA roots report and skip missing pits without creating them.
+- Large explicitly applied pruning/legacy-repair runs can trigger a CloudDrive mass-deletion confirmation for the obsolete artifacts reported by the command; review those counts before confirming the provider action.
+- Aligns fallback dependencies on `JsonPit 4.2.9` and `OsLibCore 4.2.9`, and reports `pits v4.2.9`.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.9.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.9.md)
+- Mandatory storage contract: [Cloud-Storage-In-Place-Invariant.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/Cloud-Storage-In-Place-Invariant.md)
+
 ## 4.2.8
 
 - Implements accepted CR021 `pits maintain (<PitName> | --wwwa)` with report-only default and explicit `--apply`.
@@ -412,7 +422,7 @@ Items in any pit can reference items in other pits using these section keywords.
 
 - Coordinated release order: `OsLibCore -> RaiUtils -> RaiImage -> RaiDiagram -> JsonPit -> ImgSeeder -> PitSeeder`
 
-When a matching tag is pushed from the `RAIkeep` repository, the GitHub Actions workflow at `.github/workflows/publish-pitseeder-nuget.yml` now:
+When a matching tag is pushed from the `RAIkeep` repository, the GitHub Actions workflow at `.github/workflows/publish-nuget.yaml` now:
 
 - publishes the `PitSeeder` NuGet tool package from `PitSeeder/pits/pits.csproj`
 - builds self-contained single-file `pits` binaries for `osx-arm64`, `osx-x64`, `linux-x64`, and `win-x64`
