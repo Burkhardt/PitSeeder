@@ -154,6 +154,36 @@ content-valid extensionless process flags or recovery events additionally requir
 `--repair-legacy-extensions`. Unknown, malformed, live, master, and conflict files
 are retained.
 
+One command can perform ordinary WWWA maintenance and explicit process-window
+pruning together:
+
+```bash
+pits maintain --wwwa -c OneDrive -r AIA \
+  --apply \
+  --prune-process-flags \
+  --older-than 01:00:00 \
+  --json
+```
+
+Do not follow this with a separate `pits maintain --wwwa ... --apply`; the
+combined invocation already merges changes, handles receipts, retires eligible
+pairs, and prunes eligible process flags.
+
+Normal writable JsonPit construction with `autoload: true` also applies ordinary
+change/receipt maintenance when that instance obtains exact-master authority.
+This preserves the original "master opening performs cleanup" behavior, but it
+does not create a background timer: a receipt's ten-minute grace must have
+elapsed before a later opening or maintenance pass can delete its pair. A
+long-running service that opens each pit only once therefore needs a periodic
+maintenance call if it should retire eligible pairs without waiting for its next
+restart.
+
+Process-flag pruning remains deliberately explicit and is never performed merely
+because a master opens a pit. `--prune-process-flags` currently requires
+`--apply`; ordinary report-only maintenance inventories active, released, and
+naturally expired flags, but does not preview the exact prune/defer decision.
+Recovery events are durable audit records and are not deleted by `maintain`.
+
 ### Delete a nested property or item
 
 `delete-property` interprets `PropertyPath` as a dot-delimited JSON path. It
