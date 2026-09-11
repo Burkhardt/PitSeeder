@@ -45,9 +45,22 @@ public sealed class LocalCliTicketWindowTests : IDisposable
 
 		Assert.Equal(0, firstRun.exitCode);
 		Assert.Equal(0, secondRun.exitCode);
-		var flags = PitsProcessFlags(root / "Person");
-		Assert.NotEmpty(flags);
-		Assert.All(flags, flag => Assert.True(flag.IsExpired));
+		Assert.Empty(PitsProcessFlags(root / "Person"));
+	}
+
+	[Fact]
+	public void TwentySequentialFiniteCliQueries_LeaveNoProcessFlags()
+	{
+		MasterFlagFile.TicketDuration = TimeSpan.FromMinutes(5);
+		CreatePit("Person", "InitialPerson");
+
+		for (var index = 0; index < 20; index++)
+		{
+			var run = RunPits("-n", "-r", root.FullPath, "Person", "--json");
+			Assert.Equal(0, run.exitCode);
+		}
+
+		Assert.Empty(PitsProcessFlags(root / "Person"));
 	}
 
 	[Fact]
@@ -77,9 +90,7 @@ public sealed class LocalCliTicketWindowTests : IDisposable
 		var run = RunPits("-n", "-s", invalidSource.FullName, "-r", root.FullPath, "Activity");
 
 		Assert.Equal(1, run.exitCode);
-		var flags = PitsProcessFlags(root / "Activity");
-		Assert.Single(flags);
-		Assert.True(flags[0].IsExpired);
+		Assert.Empty(PitsProcessFlags(root / "Activity"));
 	}
 
 	[Fact]

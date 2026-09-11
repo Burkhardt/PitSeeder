@@ -73,7 +73,7 @@ public static class Messages
 		$"--json\t\t{(Json ? Icons.Success : Icons.NotAvailable)}\texport to stdout (for piping to jq, grep, etc.)",
 		$"--at\t\t{Icons.Info}\tproject export history at an offset-explicit ISO-8601 timestamp",
 		$"--wwwa\t\t{(Wwwa ? Icons.Success : Icons.NotAvailable)}\toperate on all 4 pits (Person, Object, Place, Activity)",
-		$"--retain-window\t{Icons.Info}\tkeep this CLI process activity window until its normal timeout",
+		$"--retain-window\t{Icons.Info}\t4.x compatibility: keep the activity window until timeout",
 		$"{Icons.Warning} Legacy\t{Icons.Info}\tflat seed/export flags remain supported in 4.x; use command syntax before 5.x",
 		$"{Icons.Info} PitName\t{Icons.File}\t{PitNameDescription()}",
 		$"\t\t{Icons.Info}\tpositional arg: pit to operate on, or target pit name when used with -s",
