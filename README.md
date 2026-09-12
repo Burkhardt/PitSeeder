@@ -21,9 +21,16 @@ Operational recovery-log guidance: [`PITS-AUDIT.md`](https://github.com/Burkhard
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
-## 4.2.11
+## 4.3.0
 
-- Implements accepted CR024: default finite `pits` calls delete every exact PID-specific process flag they own after normal or exceptional completion.
+- Carries accepted CR024: finite `pits` calls delete every exact PID-specific process flag they own after normal or exceptional completion.
+- `--retain-window` remains the documented 4.x compatibility exception and is scheduled for removal in the next major release.
+- Aligns fallback dependencies on `JsonPit 4.3.0` and `OsLibCore 4.3.0`, and reports `pits v4.3.0`.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.3.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.3.0.md)
+
+## 4.2.11 (superseded before publication)
+
+- This prepared line was not published; its CR024 changes are carried by v4.3.0.
 - Ctrl+C and process-exit handlers converge on the same `Pit.Dispose()` cleanup; `Master.flag` remains untouched.
 - `--retain-window` remains a documented compatibility exception in v4.2.11 and is scheduled for removal in the next major release.
 - Aligns fallback dependencies on `JsonPit 4.2.11` and `OsLibCore 4.2.11`, and reports `pits v4.2.11`.
@@ -284,7 +291,7 @@ syntax is preferred for new scripts. The `5.x.x` line will require subcommands.
 
 ## Process-window lifecycle
 
-Finite `pits` commands dispose their pits through JsonPit's durability boundary by default after normal completion and when execution unwinds through an exception: accepted fragments are exported as collision-safe change files before the process activity window is released. Ctrl+C and process exit also attempt this cleanup. Use `--retain-window` only when the prior timeout-based activity behavior is explicitly required; it is a v4.2.11 compatibility exception scheduled for removal in the next major release.
+Finite `pits` commands dispose their pits through JsonPit's durability boundary by default after normal completion and when execution unwinds through an exception: accepted fragments are exported as collision-safe change files before the process activity window is released. Ctrl+C and process exit also attempt this cleanup. Use `--retain-window` only when the prior timeout-based activity behavior is explicitly required; it is a v4.3.0 compatibility exception scheduled for removal in the next major release.
 
 Each invocation uses `{MachineName}-pits-{PID}.flag`. Release succeeds only while the flag content still identifies that OS process, then removes that exact file through `RaiFile.rm()` (including the cloud disappearance wait). Another process's activity flag cannot be released. A crash or forced termination can still leave its flag for TTL-based inspection and explicit maintenance pruning.
 
