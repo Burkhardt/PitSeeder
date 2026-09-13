@@ -21,6 +21,13 @@ Operational recovery-log guidance: [`PITS-AUDIT.md`](https://github.com/Burkhard
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
+## 4.3.2
+
+- Participates unchanged in coordinated RAIkeep v4.3.2.
+- Aligns fallback dependencies on `JsonPit 4.3.2` and `OsLibCore 4.3.2`, and reports `pits v4.3.2`.
+- CR024 clean-exit process-flag behavior remains unchanged.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.3.2.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.3.2.md)
+
 ## 4.3.1
 
 - Participates unchanged in coordinated RAIkeep v4.3.1.
