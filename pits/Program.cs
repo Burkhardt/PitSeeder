@@ -1069,7 +1069,7 @@ internal static class Program
 		{
 			Messages.WriteDebug($"{Icons.Info} Processing {pit.JsonFile.Name} Pit...");
 			var payload = source.ReadAllText();
-			var root = JToken.Parse(payload);
+			var root = ParseSeedPayload(payload, source.FullName);
 			JArray itemsArray = root switch
 			{
 				JArray arr => arr,
@@ -1085,6 +1085,34 @@ internal static class Program
 		finally
 		{
 			ReleaseProcessWindow(pit);
+		}
+	}
+
+	private static JToken ParseSeedPayload(string payload, string sourceName)
+	{
+		if (string.IsNullOrWhiteSpace(payload))
+			throw new ArgumentException($"Seed source '{sourceName}' is empty.");
+		try
+		{
+			// StringReader is deliberately an in-memory parser boundary. Source file I/O
+			// remains on OsLib's TextFile boundary above.
+			using var textReader = new StringReader(payload);
+			using var jsonReader = new JsonTextReader(textReader)
+			{
+				DateParseHandling = DateParseHandling.None
+			};
+			return JToken.Load(jsonReader, new JsonLoadSettings
+			{
+				CommentHandling = CommentHandling.Ignore,
+				DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error,
+				LineInfoHandling = LineInfoHandling.Load
+			});
+		}
+		catch (JsonException exception)
+		{
+			throw new ArgumentException(
+				$"Seed source '{sourceName}' is not valid supported JSON5: {exception.Message}",
+				exception);
 		}
 	}
 	private static int RunBulkSeed(RaiPath sourceDir, RaiPath pitRoot)

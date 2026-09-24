@@ -21,6 +21,13 @@ Operational recovery-log guidance: [`PITS-AUDIT.md`](https://github.com/Burkhard
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
+## 4.4.0
+
+- `pits seed` accepts JSON5 line or block comments before the root array/map.
+- Malformed payloads are still rejected; the CLI does not use a catch-all retry that can conceal unrelated parse failures.
+- Aligns dependencies on `JsonPit 4.4.0` and `OsLibCore 4.4.0`, and reports `pits v4.4.0`.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.4.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.0.md)
+
 ## 4.3.2
 
 - Participates unchanged in coordinated RAIkeep v4.3.2.

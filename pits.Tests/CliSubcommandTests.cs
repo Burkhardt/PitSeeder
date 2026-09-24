@@ -36,6 +36,43 @@ public sealed class CliSubcommandTests : IDisposable
 		Assert.Equal("CommandPerson", (string?)Assert.Single(payload)["Id"]);
 	}
 
+	[Theory]
+	[InlineData("// Seed maintained by Zébio\n[{ Id: 'LeadingComment', Name: 'Line Comment' }]")]
+	[InlineData("/* Seed maintained by Vesco. */\n[{ Id: 'LeadingComment', Name: 'Block Comment' }]")]
+	public void SeedCommand_AcceptsLeadingJson5CommentBeforeArray(string payload)
+	{
+		var source = new TextFile(root, "leading-comment", "json5")
+		{
+			Lines = payload.Split('\n').ToList(),
+			Changed = true
+		};
+		source.Save();
+
+		var seed = RunPits("seed", "Person", "--source", source.FullName, "-r", root.FullPath, "-n");
+		var export = RunPits("export", "Person", "--json", "-r", root.FullPath, "-n");
+
+		Assert.Equal(0, seed.exitCode);
+		Assert.Equal(0, export.exitCode);
+		var payloadArray = JArray.Parse(export.output[export.output.IndexOf('[')..]);
+		Assert.Equal("LeadingComment", (string?)Assert.Single(payloadArray)["Id"]);
+	}
+
+	[Fact]
+	public void SeedCommand_DoesNotMaskMalformedJsonAfterLeadingComment()
+	{
+		var source = new TextFile(root, "malformed-leading-comment", "json5")
+		{
+			Lines = ["// A valid comment is not permission to ignore an invalid payload.", "[{ Id: ]"],
+			Changed = true
+		};
+		source.Save();
+
+		var seed = RunPits("seed", "Person", "--source", source.FullName, "-r", root.FullPath, "-n");
+
+		Assert.NotEqual(0, seed.exitCode);
+		Assert.False(new RaiFile(root / "Person", "Person", "pit").Exists());
+	}
+
 	[Fact]
 	public void DeletePropertyCommand_DeletesNestedProperty_AndPreservesSibling()
 	{
@@ -340,7 +377,7 @@ public sealed class CliSubcommandTests : IDisposable
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.3.2", run.output.Trim());
+		Assert.Equal("pits v4.4.0", run.output.Trim());
 	}
 
 	private void CreatePit()
