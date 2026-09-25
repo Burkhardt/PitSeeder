@@ -377,7 +377,31 @@ public sealed class CliSubcommandTests : IDisposable
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.4.0", run.output.Trim());
+		Assert.Equal("pits v4.4.1", run.output.Trim());
+	}
+
+	[Fact]
+	public void MisplacedVerb_FailsFastWithActionableCorrection()
+	{
+		var run = RunPits("-n", "export", "-c", "OneDrive", "-r", "AIA", "Person", "--json");
+
+		Assert.Equal(2, run.exitCode);
+		Assert.Contains("Subcommand 'export' must be the first parameter", run.error);
+		Assert.Contains("pits export -n -c OneDrive -r AIA Person --json", run.error);
+		Assert.DoesNotContain("export.pit", run.error, StringComparison.Ordinal);
+	}
+
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public void VersionFlag_TakesImmediatePrecedence(bool versionFirst)
+	{
+		var args = versionFirst ? new[] { "-v", "export" } : new[] { "export", "-v" };
+		var run = RunPits(args);
+
+		Assert.Equal(0, run.exitCode);
+		Assert.Equal("pits v4.4.1", run.output.Trim());
+		Assert.Empty(run.error);
 	}
 
 	private void CreatePit()
@@ -431,12 +455,12 @@ public sealed class CliSubcommandTests : IDisposable
 		catch { }
 	}
 
-	private static (int exitCode, string output) RunPits(params string[] args)
+	private static (int exitCode, string output, string error) RunPits(params string[] args)
 	{
 		var pitsDll = new RaiFile(new RaiPath(AppContext.BaseDirectory), "pits", "dll");
 		Assert.True(pitsDll.Exists(), $"Expected pits.dll at {pitsDll.FullName}");
 
 		var result = PitsCommand.ForManagedAssembly(pitsDll).Run(args);
-		return (result.ExitCode, result.Output);
+		return (result.ExitCode, result.Output, result.StandardError);
 	}
 }

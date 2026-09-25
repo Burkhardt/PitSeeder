@@ -222,6 +222,10 @@ public static class Messages
 internal static class Program
 {
 	private const string CliSubscriber = "pits";
+	private static readonly string[] Commands =
+	[
+		"seed", "export", "audit", "delete-property", "delete-item", "maintain"
+	];
 	private static readonly object ActivePitsLock = new();
 	private static readonly HashSet<Pit> ActivePits = [];
 	static Program()
@@ -231,11 +235,17 @@ internal static class Program
 	}
 	private static int Main(string[] args)
 	{
-		if (args.Length > 0)
+		if (HasOption(args, "-v", "--version"))
+			return RunMappedArguments(args);
+
+		if (args.Length > 0 && Commands.Contains(args[0], StringComparer.Ordinal))
+			return RunCommand(args[0], args[1..]);
+
+		if (!HasOption(args, "-h", "--help") &&
+			CliVerbDispatch.DetectMisplacedVerb("pits", args, Commands) is { } diagnostic)
 		{
-			var command = args[0];
-			if (command is "seed" or "export" or "audit" or "delete-property" or "delete-item" or "maintain")
-				return RunCommand(command, args[1..]);
+			Console.Error.WriteLine(diagnostic.Message);
+			return 2;
 		}
 
 		if (HasOption(args, "--events", "--event-machine", "--event-level"))

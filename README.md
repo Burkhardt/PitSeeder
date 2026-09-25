@@ -21,12 +21,15 @@ Operational recovery-log guidance: [`PITS-AUDIT.md`](https://github.com/Burkhard
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
-## 4.4.0
+## 4.4.1
 
-- `pits seed` accepts JSON5 line or block comments before the root array/map.
-- Malformed payloads are still rejected; the CLI does not use a catch-all retry that can conceal unrelated parse failures.
-- Aligns dependencies on `JsonPit 4.4.0` and `OsLibCore 4.4.0`, and reports `pits v4.4.0`.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.4.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.0.md)
+- Participates in synchronized RAIkeep v4.4.1 CR037/CR037.1.
+- Misplaced reserved verbs fail with exit code `2` and an actionable verb-first
+  correction before pit or filesystem access; version flags take immediate precedence.
+- `pits seed` continues to accept JSON5 line or block comments before the root array/map.
+- Malformed payloads remain rejected; the CLI does not use a catch-all retry that can conceal unrelated parse failures.
+- Aligns dependencies on `JsonPit 4.4.1` and `OsLibCore 4.4.1`, and reports `pits v4.4.1`.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.4.1.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.1.md)
 
 ## 4.3.2
 
@@ -152,6 +155,12 @@ sudo dotnet tool install PitSeeder --tool-path /usr/local/bin
 ```
 
 To update:
+
+```bash
+dotnet tool update --global PitSeeder
+```
+
+To update an installation in `/usr/local/bin`:
 
 ```bash
 sudo dotnet tool update PitSeeder --tool-path /usr/local/bin
