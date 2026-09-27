@@ -73,6 +73,26 @@ public sealed class CliSubcommandTests : IDisposable
 		Assert.False(new RaiFile(root / "Person", "Person", "pit").Exists());
 	}
 
+	[Theory]
+	[InlineData("Modified", "'2026-09-26T20:00:00Z'")]
+	[InlineData("deleted", "true")]
+	public void SeedCommand_RejectsProtectedLifecycleAttributesBeforeOpeningPit(string attribute, string value)
+	{
+		var source = new TextFile(root, "protected-seed", "json5")
+		{
+			Lines = [$"[{{ Id: 'Protected', Role: 'Musician', {attribute}: {value} }}]"],
+			Changed = true
+		};
+		source.Save();
+
+		var seed = RunPits("seed", "Person", "--source", source.FullName, "-r", root.FullPath, "-n");
+
+		Assert.Equal(1, seed.exitCode);
+		Assert.Contains("protected attribute", seed.error, StringComparison.OrdinalIgnoreCase);
+		Assert.Contains(attribute, seed.error, StringComparison.OrdinalIgnoreCase);
+		Assert.False((root / "Person").Exists());
+	}
+
 	[Fact]
 	public void DeletePropertyCommand_DeletesNestedProperty_AndPreservesSibling()
 	{
@@ -123,6 +143,31 @@ public sealed class CliSubcommandTests : IDisposable
 		Assert.Equal(1, RunPits("delete-property", "Activity", "Item", "What..Chat", "-r", root.FullPath, "-n").exitCode);
 		Assert.Equal(1, RunPits("delete-property", "Activity", "Missing", "What.Chat", "-r", root.FullPath, "-n").exitCode);
 		Assert.Equal(1, RunPits("delete-item", "Activity", "Missing", "-r", root.FullPath, "-n").exitCode);
+	}
+
+	[Theory]
+	[InlineData("Id")]
+	[InlineData("modified")]
+	[InlineData("Deleted")]
+	public void DeletePropertyCommand_RejectsProtectedAttributes_WithoutChangingItem(string propertyPath)
+	{
+		var source = new TextFile(root, "protected-delete", "json5")
+		{
+			Lines = ["[{ Id: 'Protected', Role: 'Musician' }]"],
+			Changed = true
+		};
+		source.Save();
+		Assert.Equal(0, RunPits("seed", "Person", "--source", source.FullName, "-r", root.FullPath, "-n").exitCode);
+
+		var deletion = RunPits(
+			"delete-property", "Person", "Protected", propertyPath,
+			"-r", root.FullPath, "-n");
+
+		Assert.Equal(1, deletion.exitCode);
+		Assert.Contains("Cannot tombstone protected attribute", deletion.error);
+		var export = RunPits("export", "Person", "--json", "-r", root.FullPath, "-n");
+		var item = Assert.Single(JArray.Parse(export.output[export.output.IndexOf('[')..]));
+		Assert.Equal("Musician", item["Role"]?.Value<string>());
 	}
 
 	[Fact]

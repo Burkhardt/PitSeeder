@@ -493,6 +493,10 @@ internal static class Program
 			}
 			#endregion
 		}
+		catch (JsonPitException ex)
+		{
+			Console.Error.WriteLine($"Error: {ex.Message}");
+		}
 		catch (ArgumentException ex)
 		{
 			Messages.WriteError($"CLI Error: {ex.Message}");
@@ -524,6 +528,11 @@ internal static class Program
 				"maintain" => RunMaintainCommand(args),
 				_ => throw new ArgumentException($"Unknown command '{command}'.")
 			};
+		}
+		catch (JsonPitException ex)
+		{
+			Console.Error.WriteLine($"Error: {ex.Message}");
+			return 1;
 		}
 		catch (ArgumentException ex)
 		{
@@ -827,8 +836,9 @@ internal static class Program
 			}
 			else
 			{
-				item.DeletePropertyPath(propertyPath);
-				pit.Add(item);
+				var mutation = new PitItem(itemId);
+				mutation.DeletePropertyPath(propertyPath);
+				pit.Add(mutation);
 			}
 
 			pit.Save();
@@ -1074,20 +1084,29 @@ internal static class Program
 	private static void SeedPit(TextFile source, PitFile pitFile)
 	{
 		Messages.WriteInfo($"Seeding pit from source file: {source.FullName} \n\tto destination: {pitFile.FullName}");
+		var payload = source.ReadAllText();
+		var root = ParseSeedPayload(payload, source.FullName);
+		JArray itemsArray = root switch
+		{
+			JArray arr => arr,
+			// Keyed object map: { "Id1": { ... }, "Id2": { ... } } → take the values
+			JObject obj => new JArray(obj.Properties().Select(p => p.Value)),
+			_ => throw new ArgumentException(
+				$"Source '{source.FullName}' must be a JSON array or keyed object map; got {root.Type}.")
+		};
+		foreach (var item in itemsArray)
+		{
+			if (item is not JObject itemObject)
+				throw new ArgumentException($"Source '{source.FullName}' must contain only JSON objects.");
+			PitItem.ValidateClientPayload(itemObject);
+		}
+
+		// Parsing and validation deliberately precede opening the destination Pit. A rejected
+		// client payload therefore cannot create flags, directories, or partial state.
 		var pit = TrackPit(new Pit(pitFile, subscriber: CliSubscriber, readOnly: false));
 		try
 		{
 			Messages.WriteDebug($"{Icons.Info} Processing {pit.JsonFile.Name} Pit...");
-			var payload = source.ReadAllText();
-			var root = ParseSeedPayload(payload, source.FullName);
-			JArray itemsArray = root switch
-			{
-				JArray arr => arr,
-				// Keyed object map: { "Id1": { ... }, "Id2": { ... } } → take the values
-				JObject obj => new JArray(obj.Properties().Select(p => p.Value)),
-				_ => throw new ArgumentException(
-					$"Source '{source.FullName}' must be a JSON array or keyed object map; got {root.Type}.")
-			};
 			pit.AddItems(itemsArray.ToString());
 			pit.Save();
 			Messages.WriteSuccess($"{Icons.Success} Initialized and saved {pit.JsonFile.Name} to {pit.JsonFile.FullName}");
