@@ -21,19 +21,23 @@ Operational recovery-log guidance: [`PITS-AUDIT.md`](https://github.com/Burkhard
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
-## 4.4.1
+## 4.4.2
 
-- Participates in synchronized RAIkeep v4.4.1 CR037/CR037.1.
-- Misplaced reserved verbs fail with exit code `2` and an actionable verb-first
-  correction before pit or filesystem access; version flags take immediate precedence.
-- `pits seed` continues to accept JSON5 line or block comments before the root array/map.
-- Malformed payloads remain rejected; the CLI does not use a catch-all retry that can conceal unrelated parse failures.
 - CR040 rejects seed payloads containing client-supplied `Modified` or `Deleted`
   before opening the destination pit. `delete-property` rejects `Id`, `Modified`,
   and `Deleted`; use `delete-item` for the lifecycle transition.
 - CR041 clean change files and their receipts are merged and maintained alongside
   legacy SHA-suffixed artifacts without an upgrade conversion step.
-- Aligns dependencies on `JsonPit 4.4.1` and `OsLibCore 4.4.1`, and reports `pits v4.4.1`.
+- Aligns dependencies on `JsonPit 4.4.2` and `OsLibCore 4.4.2`, and reports `pits v4.4.2`.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.4.2.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.2.md)
+
+## 4.4.1
+
+- Participates in synchronized RAIkeep v4.4.1 CR037/CR037.1.
+- Misplaced reserved verbs fail with exit code `2` and an actionable verb-first
+  correction before pit or filesystem access; version flags take immediate precedence.
+- `pits seed` accepts JSON5 line or block comments before the root array/map.
+- Malformed payloads remain rejected without a catch-all parse retry.
 - Current release notes: [PitSeeder_RELEASE_NOTES_4.4.1.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.1.md)
 
 ## 4.3.2
