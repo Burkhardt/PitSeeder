@@ -21,6 +21,16 @@ Operational recovery-log guidance: [`PITS-AUDIT.md`](https://github.com/Burkhard
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
+## 4.4.3
+
+- Implements accepted CR043: `pits seed` accepts a single root entity object
+  only when it has an exact, non-empty string `Id`; arrays and keyed entity maps
+  remain supported.
+- Invalid shapes receive a diagnostic describing all three accepted forms, and
+  every entity is validated before the destination pit is opened.
+- Aligns dependencies on `JsonPit 4.4.3` and `OsLibCore 4.4.3`, and reports `pits v4.4.3`.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.4.3.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.3.md)
+
 ## 4.4.2
 
 - CR040 rejects seed payloads containing client-supplied `Modified` or `Deleted`

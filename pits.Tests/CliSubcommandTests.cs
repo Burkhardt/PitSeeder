@@ -36,6 +36,109 @@ public sealed class CliSubcommandTests : IDisposable
 		Assert.Equal("CommandPerson", (string?)Assert.Single(payload)["Id"]);
 	}
 
+	[Fact]
+	public void SeedCommand_AcceptsSingleRootEntityWithNonEmptyStringId()
+	{
+		var source = new TextFile(root, "single-entity", "json5")
+		{
+			Lines = ["{ Id: 'PerformLive', Kind: 'UC', Name: 'Perform Live Show' }"],
+			Changed = true
+		};
+		source.Save();
+
+		var seed = RunPits("seed", "Activity", "--source", source.FullName, "-r", root.FullPath, "-n");
+		var export = RunPits("export", "Activity", "--json", "-r", root.FullPath, "-n");
+
+		Assert.Equal(0, seed.exitCode);
+		Assert.Equal(0, export.exitCode);
+		var item = Assert.Single(JArray.Parse(export.output[export.output.IndexOf('[')..]));
+		Assert.Equal("PerformLive", item["Id"]?.Value<string>());
+		Assert.Equal("UC", item["Kind"]?.Value<string>());
+	}
+
+	[Fact]
+	public void SeedCommand_AcceptsKeyedEntityMap()
+	{
+		var source = new TextFile(root, "keyed-map", "json5")
+		{
+			Lines = ["{ Item1: { Id: 'Item1', Kind: 'Obj' }, Item2: { Id: 'Item2', Kind: 'Obj' } }"],
+			Changed = true
+		};
+		source.Save();
+
+		var seed = RunPits("seed", "Object", "--source", source.FullName, "-r", root.FullPath, "-n");
+		var export = RunPits("export", "Object", "--json", "-r", root.FullPath, "-n");
+
+		Assert.Equal(0, seed.exitCode);
+		Assert.Equal(0, export.exitCode);
+		var ids = JArray.Parse(export.output[export.output.IndexOf('[')..])
+			.Select(item => item["Id"]?.Value<string>())
+			.OfType<string>()
+			.OrderBy(id => id)
+			.ToArray();
+		Assert.Equal(new[] { "Item1", "Item2" }, ids);
+	}
+
+	[Theory]
+	[InlineData("{ Kind: 'UC', Name: 'Missing Id' }")]
+	[InlineData("{ Id: '', Kind: 'UC' }")]
+	[InlineData("{ Id: '   ', Kind: 'UC' }")]
+	[InlineData("{ Id: 42, Kind: 'UC' }")]
+	[InlineData("{ id: 'lowercase-is-not-Id', Kind: 'UC' }")]
+	public void SeedCommand_RejectsInvalidSingleRootObjectWithThreeWayDiagnostic(string payload)
+	{
+		var source = new TextFile(root, "invalid-single", "json5")
+		{
+			Lines = [payload],
+			Changed = true
+		};
+		source.Save();
+
+		var seed = RunPits("seed", "Activity", "--source", source.FullName, "-r", root.FullPath, "-n");
+
+		Assert.Equal(1, seed.exitCode);
+		Assert.Contains("JSON array of entities", seed.output);
+		Assert.Contains("single entity object with a non-empty 'Id'", seed.output);
+		Assert.Contains("keyed map of entity objects", seed.output);
+		Assert.False((root / "Activity").Exists());
+	}
+
+	[Theory]
+	[InlineData("[{ Name: 'Missing Id' }]")]
+	[InlineData("{ Item1: { Name: 'Missing Id' } }")]
+	public void SeedCommand_RejectsEntityWithoutIdBeforeOpeningPit(string payload)
+	{
+		var source = new TextFile(root, "missing-entity-id", "json5")
+		{
+			Lines = [payload],
+			Changed = true
+		};
+		source.Save();
+
+		var seed = RunPits("seed", "Activity", "--source", source.FullName, "-r", root.FullPath, "-n");
+
+		Assert.Equal(1, seed.exitCode);
+		Assert.Contains("entity without a non-empty string 'Id'", seed.output);
+		Assert.False((root / "Activity").Exists());
+	}
+
+	[Fact]
+	public void SeedCommand_RejectsNonObjectArrayEntryBeforeOpeningPit()
+	{
+		var source = new TextFile(root, "invalid-array", "json5")
+		{
+			Lines = ["[{ Id: 'Valid' }, 'InvalidString']"],
+			Changed = true
+		};
+		source.Save();
+
+		var seed = RunPits("seed", "Activity", "--source", source.FullName, "-r", root.FullPath, "-n");
+
+		Assert.Equal(1, seed.exitCode);
+		Assert.Contains("may contain only JSON objects", seed.output);
+		Assert.False((root / "Activity").Exists());
+	}
+
 	[Theory]
 	[InlineData("// Seed maintained by Zébio\n[{ Id: 'LeadingComment', Name: 'Line Comment' }]")]
 	[InlineData("/* Seed maintained by Vesco. */\n[{ Id: 'LeadingComment', Name: 'Block Comment' }]")]
@@ -422,7 +525,7 @@ public sealed class CliSubcommandTests : IDisposable
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.4.2", run.output.Trim());
+		Assert.Equal("pits v4.4.3", run.output.Trim());
 	}
 
 	[Fact]
@@ -445,7 +548,7 @@ public sealed class CliSubcommandTests : IDisposable
 		var run = RunPits(args);
 
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.4.2", run.output.Trim());
+		Assert.Equal("pits v4.4.3", run.output.Trim());
 		Assert.Empty(run.error);
 	}
 

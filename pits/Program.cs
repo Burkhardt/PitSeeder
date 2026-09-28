@@ -1086,18 +1086,25 @@ internal static class Program
 		Messages.WriteInfo($"Seeding pit from source file: {source.FullName} \n\tto destination: {pitFile.FullName}");
 		var payload = source.ReadAllText();
 		var root = ParseSeedPayload(payload, source.FullName);
+		var shapeDiagnostic =
+			$"Source '{source.FullName}' must be a JSON array of entities, a single entity object " +
+			"with a non-empty 'Id', or a keyed map of entity objects.";
 		JArray itemsArray = root switch
 		{
 			JArray arr => arr,
+			JObject obj when HasNonEmptyStringId(obj) => new JArray(obj),
 			// Keyed object map: { "Id1": { ... }, "Id2": { ... } } → take the values
-			JObject obj => new JArray(obj.Properties().Select(p => p.Value)),
-			_ => throw new ArgumentException(
-				$"Source '{source.FullName}' must be a JSON array or keyed object map; got {root.Type}.")
+			JObject obj when obj.Properties().All(property => property.Value is JObject) =>
+				new JArray(obj.Properties().Select(property => property.Value)),
+			_ => throw new ArgumentException(shapeDiagnostic)
 		};
 		foreach (var item in itemsArray)
 		{
 			if (item is not JObject itemObject)
-				throw new ArgumentException($"Source '{source.FullName}' must contain only JSON objects.");
+				throw new ArgumentException($"{shapeDiagnostic} Arrays and keyed maps may contain only JSON objects.");
+			if (!HasNonEmptyStringId(itemObject))
+				throw new ArgumentException(
+					$"Source '{source.FullName}' contains an entity without a non-empty string 'Id'.");
 			PitItem.ValidateClientPayload(itemObject);
 		}
 
@@ -1116,6 +1123,10 @@ internal static class Program
 			ReleaseProcessWindow(pit);
 		}
 	}
+
+	private static bool HasNonEmptyStringId(JObject item) =>
+		item[nameof(PitItem.Id)] is JValue { Type: JTokenType.String } id &&
+		!string.IsNullOrWhiteSpace(id.Value<string>());
 
 	private static JToken ParseSeedPayload(string payload, string sourceName)
 	{
