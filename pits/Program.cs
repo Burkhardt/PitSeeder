@@ -904,9 +904,15 @@ internal static class Program
 	{
 		if (string.IsNullOrWhiteSpace(requestedCloudProvider))
 			return null;
+		if (!Os.IsConfigLoaded)
+			throw new ArgumentException(MissingConfigurationDiagnostic());
 
 		return ResolveAllowedCloudProvider(requestedCloudProvider, Messages.CloudProviderOptions());
 	}
+
+	internal static string MissingConfigurationDiagnostic()
+		=> $"RAIkeep configuration was not found at '{Os.DefaultConfigFileLocation}'. " +
+			"Run 'amafu init' to detect cloud providers and create it.";
 
 	internal static string? ResolveConfiguredCloudProvider(
 		string? requestedCloudProvider,

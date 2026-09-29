@@ -17,6 +17,15 @@ public sealed class CliSubcommandTests : IDisposable
 	public void Dispose() => Cleanup();
 
 	[Fact]
+	public void MissingConfigurationDiagnostic_DirectsOperatorToAmafu()
+	{
+		Assert.Equal(
+			"RAIkeep configuration was not found at '~/.config/RAIkeep.json5'. " +
+			"Run 'amafu init' to detect cloud providers and create it.",
+			Program.MissingConfigurationDiagnostic());
+	}
+
+	[Fact]
 	public void SeedAndExportCommands_RouteThroughWorkingHandlers()
 	{
 		var source = new TextFile(root, "people", "json5")
@@ -525,7 +534,7 @@ public sealed class CliSubcommandTests : IDisposable
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.4.3", run.output.Trim());
+		Assert.Equal("pits v4.4.4", run.output.Trim());
 	}
 
 	[Fact]
@@ -548,7 +557,7 @@ public sealed class CliSubcommandTests : IDisposable
 		var run = RunPits(args);
 
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.4.3", run.output.Trim());
+		Assert.Equal("pits v4.4.4", run.output.Trim());
 		Assert.Empty(run.error);
 	}
 
