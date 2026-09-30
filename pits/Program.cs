@@ -56,7 +56,7 @@ public static class Messages
 	public static string[] Help =>
 	[
 		$"Commands:\t{Icons.Info}\tseed, export, audit, delete-property, delete-item, maintain",
-		$"  pits seed <PitName> --source <file>",
+		$"  pits seed <PitName> --source <file> [--require-existing|--patch]",
 		$"  pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [--at <ISO-8601 timestamp>]",
 		$"  pits audit <PitName> [--machine <all|local|name>] [--level <severity>] [--json]",
 		$"  pits delete-property <PitName> <ItemId> <PropertyPath>",
@@ -74,6 +74,8 @@ public static class Messages
 		$"--at\t\t{Icons.Info}\tproject export history at an offset-explicit ISO-8601 timestamp",
 		$"--wwwa\t\t{(Wwwa ? Icons.Success : Icons.NotAvailable)}\toperate on all 4 pits (Person, Object, Place, Activity)",
 		$"--retain-window\t{Icons.Info}\t4.x compatibility: keep the activity window until timeout",
+		$"--require-existing\t{Icons.Info}\tseed only: require every ID to exist in living state",
+		$"--patch\t\t{Icons.Info}\talias for --require-existing",
 		$"{Icons.Warning} Legacy\t{Icons.Info}\tflat seed/export flags remain supported in 4.x; use command syntax before 5.x",
 		$"{Icons.Info} PitName\t{Icons.File}\t{PitNameDescription()}",
 		$"\t\t{Icons.Info}\tpositional arg: pit to operate on, or target pit name when used with -s",
@@ -219,6 +221,9 @@ public static class Messages
 		foreach (var line in Help) WriteSuccess(line + Icons.HelpLineWidthCompensation);
 	}
 }
+
+internal sealed class StrictPatchValidationException(string message) : Exception(message);
+
 internal static class Program
 {
 	private const string CliSubscriber = "pits";
@@ -274,6 +279,7 @@ internal static class Program
 			bool showHelp = HasOption(args, "-h", "--help");
 			bool wwwa = Messages.Wwwa = HasOption(args, "-wwwa", "--wwwa");
 			bool json = Messages.Json = HasOption(args, "--json");
+			bool requireExisting = HasOption(args, "--require-existing", "--patch");
 			Messages.RetainWindow = HasOption(args, "--retain-window");
 			bool events = Messages.Events = HasOption(args, "--events");
 			string? eventMachine = ParamValue(args, "--event-machine");
@@ -488,10 +494,14 @@ internal static class Program
 				}
 				var name = !string.IsNullOrWhiteSpace(pitName) ? pitName : sourceFile.Name;
 				var pitFile = new PitFile(pitRoot / name, name);
-				SeedPit(sourceFile, pitFile);
+				SeedPit(sourceFile, pitFile, requireExisting);
 				return 0;
 			}
 			#endregion
+		}
+		catch (StrictPatchValidationException ex)
+		{
+			Console.Error.WriteLine($"error: {ex.Message}");
 		}
 		catch (JsonPitException ex)
 		{
@@ -529,6 +539,11 @@ internal static class Program
 				_ => throw new ArgumentException($"Unknown command '{command}'.")
 			};
 		}
+		catch (StrictPatchValidationException ex)
+		{
+			Console.Error.WriteLine($"error: {ex.Message}");
+			return 1;
+		}
 		catch (JsonPitException ex)
 		{
 			Console.Error.WriteLine($"Error: {ex.Message}");
@@ -550,15 +565,20 @@ internal static class Program
 	private static int RunSeedCommand(string[] args)
 	{
 		var valueOptions = GlobalValueOptions.Concat(["--source"]).ToHashSet(StringComparer.Ordinal);
-		var allowed = GlobalSwitchOptions.Concat(valueOptions).Concat(["--wwwa"]).ToHashSet(StringComparer.Ordinal);
+		var allowed = GlobalSwitchOptions.Concat(valueOptions).Concat([
+			"--wwwa", "--require-existing", "--patch"
+		]).ToHashSet(StringComparer.Ordinal);
 		var positionals = ValidateCommandTokens(args, allowed, valueOptions);
 		var wwwa = HasOption(args, "--wwwa");
+		var requireExisting = HasOption(args, "--require-existing", "--patch");
 		var source = ParamValue(args, "--source");
 
 		if (string.IsNullOrWhiteSpace(source))
 			throw new ArgumentException("seed requires --source <file-or-directory>.");
 		if (wwwa && positionals.Count > 0)
 			throw new ArgumentException("seed accepts either <PitName> or --wwwa, not both.");
+		if (wwwa && requireExisting)
+			throw new ArgumentException("--require-existing / --patch applies to single-pit seed operations, not --wwwa.");
 		if (!wwwa && positionals.Count != 1)
 			throw new ArgumentException("seed requires exactly one <PitName>, or --wwwa for the four-pit source directory.");
 
@@ -949,9 +969,10 @@ internal static class Program
 		{
 			"seed" => new[]
 			{
-				"Usage: pits seed <PitName> --source <file> [global options]",
+				"Usage: pits seed <PitName> --source <file> [--require-existing|--patch] [global options]",
 				"       pits seed --wwwa --source <directory> [global options]",
-				"Imports JSON/JSON5 into one pit or the four WWWA pits."
+				"Imports JSON/JSON5 into one pit or the four WWWA pits.",
+				"--require-existing, --patch  reject missing or tombstoned IDs before opening the Pit for write."
 			},
 			"export" => new[]
 			{
@@ -1087,7 +1108,7 @@ internal static class Program
 	}
 	#endregion
 	#region Seeding Methods
-	private static void SeedPit(TextFile source, PitFile pitFile)
+	private static void SeedPit(TextFile source, PitFile pitFile, bool requireExisting = false)
 	{
 		Messages.WriteInfo($"Seeding pit from source file: {source.FullName} \n\tto destination: {pitFile.FullName}");
 		var payload = source.ReadAllText();
@@ -1113,6 +1134,8 @@ internal static class Program
 					$"Source '{source.FullName}' contains an entity without a non-empty string 'Id'.");
 			PitItem.ValidateClientPayload(itemObject);
 		}
+		if (requireExisting)
+			ValidateStrictPatchTargets(pitFile, itemsArray);
 
 		// Parsing and validation deliberately precede opening the destination Pit. A rejected
 		// client payload therefore cannot create flags, directories, or partial state.
@@ -1122,11 +1145,36 @@ internal static class Program
 			Messages.WriteDebug($"{Icons.Info} Processing {pit.JsonFile.Name} Pit...");
 			pit.AddItems(itemsArray.ToString());
 			pit.Save();
-			Messages.WriteSuccess($"{Icons.Success} Initialized and saved {pit.JsonFile.Name} to {pit.JsonFile.FullName}");
+			Messages.WriteSuccess($"[pits] Successfully committed {itemsArray.Count} entity(ies) to Pit '{pitFile.Name}'.");
 		}
 		finally
 		{
 			ReleaseProcessWindow(pit);
+		}
+	}
+
+	private static void ValidateStrictPatchTargets(PitFile pitFile, JArray itemsArray)
+	{
+		if (itemsArray.Count == 0)
+			throw new StrictPatchValidationException("Patch source contained 0 entities.");
+
+		// CR047: this is an intentionally unflagged, read-only projection. It loads the
+		// canonical history and valid change fragments without acquiring a process window,
+		// a master lease, or permission to persist maintenance results. The writable Pit is
+		// constructed only after every incoming ID has passed this living-state check.
+		using var livingState = new Pit(
+			pitFile.Path,
+			subscriber: CliSubscriber,
+			readOnly: true,
+			unflagged: true,
+			autoload: true);
+		foreach (var item in itemsArray.OfType<JObject>())
+		{
+			var id = item[nameof(PitItem.Id)]!.Value<string>()!;
+			if (!livingState.Contains(id, withDeleted: false))
+				throw new StrictPatchValidationException(
+					$"Entity '{id}' does not exist in Pit '{pitFile.Name}'. " +
+					"Use without --require-existing / --patch to allow creating new entities.");
 		}
 	}
 

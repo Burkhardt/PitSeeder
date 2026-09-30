@@ -21,6 +21,16 @@ Operational recovery-log guidance: [`PITS-AUDIT.md`](https://github.com/Burkhard
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
+## 4.4.5
+
+- Implements accepted CR047 strict patch mode for `pits seed`.
+- `--require-existing` and its `--patch` alias reject missing or tombstoned IDs
+  before a writable Pit is opened; mixed batches fail atomically.
+- Successful seed operations report the committed payload count. Default
+  no-flag seed/upsert behavior remains backward compatible.
+- Aligns dependencies on `JsonPit 4.4.5` and `OsLibCore 4.4.5`, and reports `pits v4.4.5`.
+- Current release notes: [PitSeeder_RELEASE_NOTES_4.4.5.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.5.md)
+
 ## 4.4.4
 
 - Implements accepted CR044 missing-configuration guidance: storage commands
