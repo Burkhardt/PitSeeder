@@ -864,9 +864,7 @@ internal static class Program
 			}
 			else
 			{
-				var mutation = new PitItem(itemId);
-				mutation.DeletePropertyPath(propertyPath);
-				pit.Add(mutation);
+				item.DeletePropertyPath(propertyPath);
 			}
 
 			pit.Save();
