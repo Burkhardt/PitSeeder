@@ -106,9 +106,9 @@ public sealed class CliSubcommandTests : IDisposable
 		var seed = RunPits("seed", "Activity", "--source", source.FullName, "-r", root.FullPath, "-n");
 
 		Assert.Equal(1, seed.exitCode);
-		Assert.Contains("JSON array of entities", seed.output);
-		Assert.Contains("single entity object with a non-empty 'Id'", seed.output);
-		Assert.Contains("keyed map of entity objects", seed.output);
+		Assert.Contains("JSON array of entities", seed.output + seed.error);
+		Assert.Contains("single entity object with a non-empty 'Id'", seed.output + seed.error);
+		Assert.Contains("keyed map of entity objects", seed.output + seed.error);
 		Assert.False((root / "Activity").Exists());
 	}
 
@@ -127,7 +127,7 @@ public sealed class CliSubcommandTests : IDisposable
 		var seed = RunPits("seed", "Activity", "--source", source.FullName, "-r", root.FullPath, "-n");
 
 		Assert.Equal(1, seed.exitCode);
-		Assert.Contains("entity without a non-empty string 'Id'", seed.output);
+		Assert.Contains("entity without a non-empty string 'Id'", seed.output + seed.error);
 		Assert.False((root / "Activity").Exists());
 	}
 
@@ -144,7 +144,7 @@ public sealed class CliSubcommandTests : IDisposable
 		var seed = RunPits("seed", "Activity", "--source", source.FullName, "-r", root.FullPath, "-n");
 
 		Assert.Equal(1, seed.exitCode);
-		Assert.Contains("may contain only JSON objects", seed.output);
+		Assert.Contains("may contain only JSON objects", seed.output + seed.error);
 		Assert.False((root / "Activity").Exists());
 	}
 
@@ -534,7 +534,7 @@ public sealed class CliSubcommandTests : IDisposable
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.4.5", run.output.Trim());
+		Assert.Equal("pits v4.4.6", run.output.Trim());
 	}
 
 	[Fact]
@@ -557,7 +557,7 @@ public sealed class CliSubcommandTests : IDisposable
 		var run = RunPits(args);
 
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.4.5", run.output.Trim());
+		Assert.Equal("pits v4.4.6", run.output.Trim());
 		Assert.Empty(run.error);
 	}
 

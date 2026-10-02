@@ -21,6 +21,12 @@ Operational recovery-log guidance: [`PITS-AUDIT.md`](https://github.com/Burkhard
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
+## 4.4.6
+
+Adds explicit `pits seed <PitName> --source -` ingestion and whole-batch live-ID preflight before writable Pit creation. Typed OsLib callers can provide buffered standard input. Reports `pits v4.4.6`.
+
+Release notes: [PitSeeder_RELEASE_NOTES_4.4.6.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.6.md).
+
 ## 4.4.5
 
 - Implements accepted CR047 strict patch mode for `pits seed`.

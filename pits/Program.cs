@@ -56,7 +56,7 @@ public static class Messages
 	public static string[] Help =>
 	[
 		$"Commands:\t{Icons.Info}\tseed, export, audit, delete-property, delete-item, maintain",
-		$"  pits seed <PitName> --source <file> [--require-existing|--patch]",
+		$"  pits seed <PitName> --source <file|-> [--require-existing|--patch]",
 		$"  pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [--at <ISO-8601 timestamp>]",
 		$"  pits audit <PitName> [--machine <all|local|name>] [--level <severity>] [--json]",
 		$"  pits delete-property <PitName> <ItemId> <PropertyPath>",
@@ -486,6 +486,12 @@ internal static class Program
 			// Target pit name is the trailing positional arg if provided, else the source file name.
 			if (!string.IsNullOrWhiteSpace(sourceParam) && pitRoot != null)
 			{
+				if (sourceParam == "-")
+				{
+					if (string.IsNullOrWhiteSpace(pitName)) throw new ArgumentException("Standard input requires an explicit PitName.");
+					SeedPayload(Console.In.ReadToEnd(), "stdin", new PitFile(pitRoot / pitName, pitName), requireExisting);
+					return 0;
+				}
 				var sourceFile = new TextFile(sourceParam);
 				if (!sourceFile.Exists())
 				{
@@ -509,7 +515,7 @@ internal static class Program
 		}
 		catch (ArgumentException ex)
 		{
-			Messages.WriteError($"CLI Error: {ex.Message}");
+			Console.Error.WriteLine($"error: {ex.Message}");
 		}
 		catch (Exception ex)
 		{
@@ -574,11 +580,13 @@ internal static class Program
 		var source = ParamValue(args, "--source");
 
 		if (string.IsNullOrWhiteSpace(source))
-			throw new ArgumentException("seed requires --source <file-or-directory>.");
+			throw new ArgumentException("seed requires --source <file-or-directory|->.");
 		if (wwwa && positionals.Count > 0)
 			throw new ArgumentException("seed accepts either <PitName> or --wwwa, not both.");
 		if (wwwa && requireExisting)
 			throw new ArgumentException("--require-existing / --patch applies to single-pit seed operations, not --wwwa.");
+		if (wwwa && source == "-")
+			throw new ArgumentException("--source - applies to single-pit seed operations, not --wwwa.");
 		if (!wwwa && positionals.Count != 1)
 			throw new ArgumentException("seed requires exactly one <PitName>, or --wwwa for the four-pit source directory.");
 
@@ -910,7 +918,8 @@ internal static class Program
 				throw new ArgumentException($"Unknown option '{token}'.");
 			if (!valueOptions.Contains(token))
 				continue;
-			if (i + 1 >= args.Length || args[i + 1].StartsWith("-", StringComparison.Ordinal))
+			if (i + 1 >= args.Length || (args[i + 1].StartsWith("-", StringComparison.Ordinal)
+				&& !(token == "--source" && args[i + 1] == "-")))
 				throw new ArgumentException($"The option '{token}' requires a value.");
 			i++;
 		}
@@ -969,7 +978,7 @@ internal static class Program
 		{
 			"seed" => new[]
 			{
-				"Usage: pits seed <PitName> --source <file> [--require-existing|--patch] [global options]",
+				"Usage: pits seed <PitName> --source <file|-> [--require-existing|--patch] [global options]",
 				"       pits seed --wwwa --source <directory> [global options]",
 				"Imports JSON/JSON5 into one pit or the four WWWA pits.",
 				"--require-existing, --patch  reject missing or tombstoned IDs before opening the Pit for write."
@@ -1012,7 +1021,8 @@ internal static class Program
 	private static readonly string[] SwitchesWithValues = { "-s", "--source", "-r", "--pitroot", "-e", "--export", "-c", "--cloudprovider", "--cloud", "--event-machine", "--event-level", "--at", "--older-than" };
 	private static string? ParamValue(string[] options, params string[] aliases)
 		=> aliases.Select(a => Array.IndexOf(options, a)).Where(i => i >= 0)
-			.Select(i => i + 1 < options.Length && !options[i + 1].StartsWith("-")
+			.Select(i => i + 1 < options.Length && (!options[i + 1].StartsWith("-")
+				|| (options[i] is "--source" or "-s" && options[i + 1] == "-"))
 				? options[i + 1]
 				: throw new ArgumentException($"The option '{options[i]}' requires a value."))
 			.FirstOrDefault();
@@ -1111,10 +1121,13 @@ internal static class Program
 	private static void SeedPit(TextFile source, PitFile pitFile, bool requireExisting = false)
 	{
 		Messages.WriteInfo($"Seeding pit from source file: {source.FullName} \n\tto destination: {pitFile.FullName}");
-		var payload = source.ReadAllText();
-		var root = ParseSeedPayload(payload, source.FullName);
+		SeedPayload(source.ReadAllText(), source.FullName, pitFile, requireExisting);
+	}
+	private static void SeedPayload(string payload, string sourceName, PitFile pitFile, bool requireExisting)
+	{
+		var root = ParseSeedPayload(payload, sourceName);
 		var shapeDiagnostic =
-			$"Source '{source.FullName}' must be a JSON array of entities, a single entity object " +
+			$"Source '{sourceName}' must be a JSON array of entities, a single entity object " +
 			"with a non-empty 'Id', or a keyed map of entity objects.";
 		JArray itemsArray = root switch
 		{
@@ -1131,7 +1144,7 @@ internal static class Program
 				throw new ArgumentException($"{shapeDiagnostic} Arrays and keyed maps may contain only JSON objects.");
 			if (!HasNonEmptyStringId(itemObject))
 				throw new ArgumentException(
-					$"Source '{source.FullName}' contains an entity without a non-empty string 'Id'.");
+					$"Source '{sourceName}' contains an entity without a non-empty string 'Id'.");
 			PitItem.ValidateClientPayload(itemObject);
 		}
 		if (requireExisting)
