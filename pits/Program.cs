@@ -1156,7 +1156,9 @@ internal static class Program
 		try
 		{
 			Messages.WriteDebug($"{Icons.Info} Processing {pit.JsonFile.Name} Pit...");
-			pit.AddItems(itemsArray.ToString());
+			// Keep the validated JSON token types. Re-parsing through JArray.Parse
+			// interprets ISO dates in ordinary fields using the machine's timezone.
+			pit.AddItems(itemsArray.Cast<JObject>().Select(item => new PitItem(item)));
 			pit.Save();
 			Messages.WriteSuccess($"[pits] Successfully committed {itemsArray.Count} entity(ies) to Pit '{pitFile.Name}'.");
 		}

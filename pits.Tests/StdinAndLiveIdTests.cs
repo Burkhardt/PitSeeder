@@ -42,6 +42,19 @@ public sealed class StdinAndLiveIdTests : IDisposable
     }
 
     [Fact]
+    public void ReceiptPreservesExifOffsetThroughStdinPersistenceAndExport()
+    {
+        const string original = "2026-09-28T17:40:31+05:30";
+        var payload = "{\"Id\":\"ImportExif\",\"Class\":\"ImageImport\",\"Files\":[{\"Exif\":{\"DateTimeOriginal\":\"" + original + "\"}}]}";
+        var seed = Run(payload, "seed", "Object", "--source", "-", "-r", root, "-n");
+        Assert.True(seed.code == 0, seed.output + seed.error);
+        var export = Run(null, "export", "Object", "--json", "-r", root, "-n");
+        Assert.Equal(0, export.code);
+        using var json = System.Text.Json.JsonDocument.Parse(export.output);
+        Assert.Equal(original, json.RootElement[0].GetProperty("Files")[0].GetProperty("Exif").GetProperty("DateTimeOriginal").GetString());
+    }
+
+    [Fact]
     public void HistoricalPlaceholderCanBeExportedAndDeletedButNotReinserted()
     {
         var directory = Path.Combine(root, "Object");
