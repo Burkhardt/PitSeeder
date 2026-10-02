@@ -1,5 +1,12 @@
 # PitSeeder
 
+## 4.4.8
+
+4.4.8 uses live JsonPit property deletion and aligned dependencies; pits reports version 4.4.8.
+
+Release notes: [PitSeeder_RELEASE_NOTES_4.4.8.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.8.md).
+
+
 ## Terminal font
 
 > **Font note:** The `pits` help screen uses glyph icons from Nerd Fonts. Most
