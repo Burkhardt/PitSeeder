@@ -511,6 +511,16 @@ public sealed class CliSubcommandTests : IDisposable
 		Assert.EndsWith("  ", cloudLine, StringComparison.Ordinal);
 	}
 
+	[Theory]
+	[InlineData("googledriverainer", "GoogleDriveRainer")]
+	[InlineData("GoogleDriveYebo", "GoogleDriveYebo")]
+	[InlineData("onedrivepersonal", "OneDrivePersonal")]
+	public void CloudProvider_AcceptsAmafuAccountKeys(string requested, string expected)
+	{
+		string[] names = ["GoogleDriveRainer", "GoogleDriveYebo", "OneDrivePersonal"];
+		Assert.Equal(expected, Program.ResolveConfiguredCloudProvider(requested, names, names));
+	}
+
 	[Fact]
 	public void CloudProvider_MustBeInDefaultCloudOrder_EvenWhenCloudPathExists()
 	{
@@ -534,7 +544,7 @@ public sealed class CliSubcommandTests : IDisposable
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.5.2", run.output.Trim());
+		Assert.Equal("pits v4.5.3", run.output.Trim());
 	}
 
 	[Fact]
@@ -557,7 +567,7 @@ public sealed class CliSubcommandTests : IDisposable
 		var run = RunPits(args);
 
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.5.2", run.output.Trim());
+		Assert.Equal("pits v4.5.3", run.output.Trim());
 		Assert.Empty(run.error);
 	}
 
