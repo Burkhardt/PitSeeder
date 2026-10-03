@@ -1,5 +1,11 @@
 # PitSeeder
 
+## 4.5.0
+
+4.5.0 uses live JsonPit property deletion and aligned dependencies; pits reports version 4.5.0.
+
+Release notes: [PitSeeder_RELEASE_NOTES_4.5.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.0.md).
+
 ## 4.4.8
 
 4.4.8 uses live JsonPit property deletion and aligned dependencies; pits reports version 4.4.8.
@@ -579,7 +585,7 @@ Items in any pit can reference items in other pits using these section keywords.
 
 ## Build and Publish
 
-- Coordinated release order: `OsLibCore -> RaiUtils -> RaiImage -> RaiDiagram -> JsonPit -> ImgSeeder -> PitSeeder`
+- Coordinated release order: `Amafu -> OsLibCore -> RaiUtils -> RaiImage -> RaiDiagram -> RaidSeeder -> JsonPit -> ImgSeeder -> PitSeeder`
 
 When a matching tag is pushed from the `RAIkeep` repository, the GitHub Actions workflow at `.github/workflows/publish-nuget.yaml` now:
 
@@ -593,6 +599,10 @@ See [BuildFromSource.md](https://github.com/Burkhardt/PitSeeder/blob/main/BuildF
 - building inside the `RAIkeep` workspace against local projects
 - packing and publishing the NuGet tool
 - publishing self-contained binaries for macOS, Ubuntu, and Windows
+
+## release notes
+
+- Latest release notes: [PitSeeder_RELEASE_NOTES_4.5.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.0.md)
 
 ## License
 
