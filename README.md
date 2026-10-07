@@ -1,5 +1,11 @@
 # PitSeeder
 
+## 4.5.5
+
+Coordinated 4.5.5 release; public behavior is aligned with the synchronized platform.
+
+Release notes: [PitSeeder_RELEASE_NOTES_4.5.5.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.5.md).
+
 ## 4.5.4
 
 Coordinated 4.5.4 release; public behavior is aligned with the synchronized platform.
@@ -620,7 +626,7 @@ See [BuildFromSource.md](https://github.com/Burkhardt/PitSeeder/blob/main/BuildF
 
 ## release notes
 
-- Latest release notes: [PitSeeder_RELEASE_NOTES_4.5.4.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.4.md)
+- Latest release notes: [PitSeeder_RELEASE_NOTES_4.5.5.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.5.md)
 
 ## License
 
