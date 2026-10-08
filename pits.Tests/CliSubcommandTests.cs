@@ -6,7 +6,7 @@ namespace PitSeeder.Tests;
 
 public sealed class CliSubcommandTests : IDisposable
 {
-	private readonly RaiPath root = Os.TempDir / "RAIkeep" / "pitseeder-tests" / "cr006-subcommands";
+	private readonly RaiPath root = Os.TempDir / "RAIkeep" / "pitseeder-tests" / "cr006-subcommands" / Guid.NewGuid().ToString("N");
 
 	public CliSubcommandTests()
 	{
@@ -23,6 +23,84 @@ public sealed class CliSubcommandTests : IDisposable
 			"RAIkeep configuration was not found at '~/.config/RAIkeep.json5'. " +
 			"Run 'amafu init' to detect cloud providers and create it.",
 			Program.MissingConfigurationDiagnostic());
+	}
+
+	[Fact]
+	public void ListCommand_ListsPitsFromAnExplicitLocalDirectory()
+	{
+		CreatePitMarker("Activity");
+		CreatePitMarker("Person");
+
+		var run = RunPits("list", "-r", root.FullPath, "-n");
+
+		Assert.Equal(0, run.exitCode);
+		Assert.Contains($"Found 2 pit(s) in local directory '{root.FullPath}':", run.output);
+		Assert.Contains("  Activity", run.output);
+		Assert.Contains("  Person", run.output);
+	}
+
+	[Fact]
+	public void Ls_IsAnExactAliasForList()
+	{
+		CreatePitMarker("Object");
+
+		var run = RunPits("ls", "-r", root.FullPath, "-n");
+
+		Assert.Equal(0, run.exitCode);
+		Assert.Contains("  Object", run.output);
+	}
+
+	[Fact]
+	public void LsLa_BundlesLongAndAllFlagsForAListingRoot()
+	{
+		var tenant = root / "AIA";
+		tenant.mkdir();
+		var pitDirectory = tenant / "Person";
+		CreatePit(pitDirectory, "Person", new string('x', 2048));
+
+		var run = RunPits("ls", "-la", "-r", tenant.FullPath, "-n");
+
+		Assert.Equal(0, run.exitCode);
+		Assert.Contains("  Person", run.output);
+		Assert.Contains("KB", run.output);
+		Assert.Matches(@"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", run.output);
+		Assert.Equal(["-l", "-a"], Program.ExpandListOptionBundles(["-la"]));
+		Assert.Equal(["-l", "-a"], Program.ExpandListOptionBundles(["-al"]));
+	}
+
+	[Fact]
+	public void ListDiscovery_DeclaresCloudAndResolvedDirectory()
+	{
+		var output = Program.RenderPitDiscovery("GoogleDriveRainer", "/cloud/GoogleDriveRainer/AIA",
+			["Activity", "Object", "Person", "Place"], all: false);
+
+		Assert.Equal(
+			"Found 4 pit(s) in cloud 'GoogleDriveRainer' (/cloud/GoogleDriveRainer/AIA):" + Environment.NewLine +
+			"  Activity" + Environment.NewLine + "  Object" + Environment.NewLine +
+			"  Person" + Environment.NewLine + "  Place",
+			output);
+	}
+
+	[Fact]
+	public void ListAllDiscovery_ReportsEveryCloudIncludingEmptyRoots()
+	{
+		var found = Program.RenderPitDiscovery("OneDrive", "/cloud/OneDrive/AIA", ["Activity"], all: true);
+		var empty = Program.RenderPitDiscovery("ICloudDrive", "/cloud/ICloudDrive/AIA", [], all: true);
+
+		Assert.Equal("[OneDrive] (/cloud/OneDrive/AIA): 1 pit(s) found" + Environment.NewLine + "  Activity", found);
+		Assert.Equal("[ICloudDrive] (/cloud/ICloudDrive/AIA): No pits found.", empty);
+	}
+
+	[Fact]
+	public void Seed_RejectsBareTenantWithoutAnExplicitCloud()
+	{
+		var source = new TextFile(root, "person", "json5") { Lines = ["[{ Id: 'Person1' }]"], Changed = true };
+		source.Save();
+
+		var run = RunPits("seed", "Person", "--source", source.FullName, "-r", "AIA", "-n");
+
+		Assert.Equal(1, run.exitCode);
+		Assert.Contains("refuses to guess a cloud", run.output + run.error);
 	}
 
 	[Fact]
@@ -493,7 +571,7 @@ public sealed class CliSubcommandTests : IDisposable
 		Assert.Equal(0, rootHelp.exitCode);
 		Assert.DoesNotContain("===", rootHelp.output, StringComparison.Ordinal);
 		Assert.Contains("seed, export, audit, delete-property, delete-item, maintain", rootHelp.output, StringComparison.OrdinalIgnoreCase);
-		Assert.Contains("(default)", rootHelp.output);
+		Assert.DoesNotContain("(default)", rootHelp.output);
 		Assert.DoesNotContain(" PitRoot", rootHelp.output);
 		Assert.DoesNotContain("①", rootHelp.output, StringComparison.Ordinal);
 		var cloudLine = Assert.Single(rootHelp.output.Split('\n', StringSplitOptions.RemoveEmptyEntries),
@@ -581,6 +659,20 @@ public sealed class CliSubcommandTests : IDisposable
 		source.Save();
 		var seed = RunPits("-n", "-s", source.FullName, "-r", root.FullPath, "Person");
 		Assert.Equal(0, seed.exitCode);
+	}
+
+	private void CreatePitMarker(string name)
+	{
+		CreatePit(root / name, name, name);
+	}
+
+	private static void CreatePit(RaiPath directory, string itemId, string payload)
+	{
+		using var pit = new JsonPit.Pit(directory, readOnly: false, autoload: false, unflagged: true);
+		var item = new JsonPit.PitItem(itemId);
+		item.SetProperty(new { Payload = payload });
+		pit.Add(item);
+		pit.Save(force: true);
 	}
 
 	private static EventFile WriteAuditEvent(

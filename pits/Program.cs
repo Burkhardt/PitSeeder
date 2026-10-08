@@ -55,7 +55,8 @@ public static class Messages
 	public static bool Events { get; set; }
 	public static string[] Help =>
 	[
-		$"Commands:\t{Icons.Info}\tseed, export, audit, delete-property, delete-item, maintain",
+		$"Commands:\t{Icons.Info}\tlist (ls), seed, export, audit, delete-property, delete-item, maintain",
+		$"  pits list -r <tenant|path> [-c <cloud>] [-a|--all] [-l|--long]",
 		$"  pits seed <PitName> --source <file|-> [--require-existing|--patch]",
 		$"  pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [--at <ISO-8601 timestamp>]",
 		$"  pits audit <PitName> [--machine <all|local|name>] [--level <severity>] [--json]",
@@ -96,7 +97,7 @@ public static class Messages
 		var options = CloudProviderOptions();
 		return options.Length > 0
 			? string.Join(", ", options.Select((name, index) =>
-				$"{CloudProviderIcon(name, index + 1)} {name}{(index == 0 ? " (default)" : string.Empty)}"))
+				$"{CloudProviderIcon(name, index + 1)} {name}"))
 			: "no DefaultCloudOrder providers are configured";
 	}
 	private static string CloudIcon()
@@ -229,7 +230,7 @@ internal static class Program
 	private const string CliSubscriber = "pits";
 	private static readonly string[] Commands =
 	[
-		"seed", "export", "audit", "delete-property", "delete-item", "maintain"
+		"list", "ls", "seed", "export", "audit", "delete-property", "delete-item", "maintain"
 	];
 	private static readonly object ActivePitsLock = new();
 	private static readonly HashSet<Pit> ActivePits = [];
@@ -446,6 +447,7 @@ internal static class Program
 			// WWWA seed
 			if (wwwa && !string.IsNullOrWhiteSpace(sourceParam) && !sourceParam.EndsWith(".pit", StringComparison.OrdinalIgnoreCase))
 			{
+				RequireExplicitMutationLocation(args, "seed");
 				var sourceDir = new RaiPath(sourceParam.EndsWith(Os.DIR) ? sourceParam : sourceParam + Os.DIR);
 				return RunBulkSeed(sourceDir, pitRoot!);
 			}
@@ -486,6 +488,7 @@ internal static class Program
 			// Target pit name is the trailing positional arg if provided, else the source file name.
 			if (!string.IsNullOrWhiteSpace(sourceParam) && pitRoot != null)
 			{
+				RequireExplicitMutationLocation(args, "seed");
 				if (sourceParam == "-")
 				{
 					if (string.IsNullOrWhiteSpace(pitName)) throw new ArgumentException("Standard input requires an explicit PitName.");
@@ -536,6 +539,7 @@ internal static class Program
 
 			return command switch
 			{
+				"list" or "ls" => RunListCommand(args),
 				"seed" => RunSeedCommand(args),
 				"export" => RunExportCommand(args),
 				"audit" => RunAuditCommand(args),
@@ -568,6 +572,161 @@ internal static class Program
 		}
 	}
 
+	private sealed record PitDiscovery(string? Provider, RaiPath Root, string[] Names);
+
+	private static int RunListCommand(string[] args)
+	{
+		args = ExpandListOptionBundles(args);
+		var valueOptions = new[] { "-r", "--pitroot", "-c", "--cloudprovider", "--cloud" }.ToHashSet(StringComparer.Ordinal);
+		var allowed = valueOptions.Concat(["-n", "--nologo", "-b", "--debug", "-a", "--all", "-l", "--long"]).ToHashSet(StringComparer.Ordinal);
+		var positionals = ValidateCommandTokens(args, allowed, valueOptions);
+		if (positionals.Count != 0)
+			throw new ArgumentException("list accepts no positional PitName; specify the tenant or local directory with -r or --pitroot.");
+
+		var root = ParamValue(args, "-r", "--pitroot");
+		if (string.IsNullOrWhiteSpace(root))
+			throw new ArgumentException("list requires -r or --pitroot <tenant-or-path>.");
+		var requestedCloud = ParamValue(args, "-c", "--cloudprovider", "--cloud");
+		var all = HasOption(args, "-a", "--all");
+		var longListing = HasOption(args, "-l", "--long");
+		if (all && !string.IsNullOrWhiteSpace(requestedCloud))
+			throw new ArgumentException("--all scans DefaultCloudOrder and cannot be combined with -c or --cloud.");
+
+		if (!string.IsNullOrWhiteSpace(requestedCloud))
+		{
+			var provider = ResolveCloudProvider(requestedCloud)!;
+			var discovery = new PitDiscovery(provider, ResolveCloudRoot(provider, root), DiscoverPitNames(ResolveCloudRoot(provider, root)));
+			WriteDiscoveredPits(discovery, longListing);
+			return 0;
+		}
+
+		if (IsExplicitLocalDirectory(root))
+		{
+			var local = new RaiPath(root);
+			var names = DiscoverPitNames(local);
+			Console.WriteLine($"Found {names.Length} pit(s) in local directory '{local.FullPath}':");
+			foreach (var name in names) Console.WriteLine(FormatPitListing(local, name, longListing));
+			return 0;
+		}
+
+		var discoveries = DiscoverTenantAcrossConfiguredClouds(root);
+		if (all)
+		{
+			foreach (var discovery in discoveries) WriteAllDiscoveryStatus(discovery, longListing);
+			return 0;
+		}
+
+		var found = discoveries.FirstOrDefault(discovery => discovery.Names.Length > 0);
+		if (found is null)
+		{
+			Console.WriteLine($"No pits found under tenant root '{root}' across configured clouds.");
+			return 0;
+		}
+		WriteDiscoveredPits(found, longListing);
+		return 0;
+	}
+
+	internal static string[] ExpandListOptionBundles(IEnumerable<string> args)
+		=> args.SelectMany(argument => argument switch
+		{
+			"-la" or "-al" => new[] { "-l", "-a" },
+			_ => new[] { argument }
+		}).ToArray();
+
+	private static IReadOnlyList<PitDiscovery> DiscoverTenantAcrossConfiguredClouds(string tenant)
+	{
+		if (!Os.IsConfigLoaded) throw new ArgumentException(MissingConfigurationDiagnostic());
+		var providers = Messages.CloudProviderOptions();
+		if (providers.Length == 0)
+			throw new ArgumentException("No configured DefaultCloudOrder providers are available for tenant discovery.");
+		return providers.Select(provider =>
+		{
+			var root = ResolveCloudRoot(provider, tenant);
+			return new PitDiscovery(provider, root, DiscoverPitNames(root));
+		}).ToArray();
+	}
+
+	private static RaiPath ResolveCloudRoot(string provider, string? relativeRoot)
+	{
+		string? cloudDirectory = Os.Config?.Cloud?[provider];
+		if (string.IsNullOrWhiteSpace(cloudDirectory))
+			throw new ArgumentException($"The requested cloud provider '{provider}' is missing or empty in {Os.DefaultConfigFileLocation}.");
+		var cloudRoot = new RaiPath(cloudDirectory);
+		return string.IsNullOrWhiteSpace(relativeRoot)
+			? cloudRoot
+			: cloudRoot / new RaiRelPath(relativeRoot.TrimStart('/', '\\'));
+	}
+
+	private static string[] DiscoverPitNames(RaiPath root)
+	{
+		if (!root.Exists()) return [];
+
+		return root.EnumerateDirectories("*")
+			.OrderBy(directory => directory.FullPath, StringComparer.OrdinalIgnoreCase)
+			.Select(TryOpenPit)
+			.OfType<string>()
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.Order(StringComparer.OrdinalIgnoreCase)
+			.ToArray();
+	}
+
+	/// <summary>
+	/// Opens a candidate through JsonPit rather than treating a file called *.pit as
+	/// evidence of a usable Pit. The constructor validates the canonical Pit shape
+	/// and loads it without taking a process flag.
+	/// </summary>
+	private static string? TryOpenPit(RaiPath directory)
+	{
+		try
+		{
+			using var pit = new Pit(directory, readOnly: true, unflagged: true);
+			return pit.JsonFile.Exists() ? pit.JsonFile.Name : null;
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	private static void WriteDiscoveredPits(PitDiscovery discovery, bool longListing)
+		=> Console.WriteLine(RenderPitDiscovery(discovery.Provider, discovery.Root.FullPath, discovery.Names, all: false, longListing, discovery.Root));
+
+	private static void WriteAllDiscoveryStatus(PitDiscovery discovery, bool longListing)
+		=> Console.WriteLine(RenderPitDiscovery(discovery.Provider, discovery.Root.FullPath, discovery.Names, all: true, longListing, discovery.Root));
+
+	internal static string RenderPitDiscovery(string? provider, string resolvedPath, IEnumerable<string> names, bool all)
+		=> RenderPitDiscovery(provider, resolvedPath, names, all, longListing: false, root: null);
+
+	private static string RenderPitDiscovery(
+		string? provider,
+		string resolvedPath,
+		IEnumerable<string> names,
+		bool all,
+		bool longListing,
+		RaiPath? root)
+	{
+		var discovered = names.ToArray();
+		if (all && discovered.Length == 0)
+		{
+			return $"[{provider}] ({resolvedPath}): No pits found.";
+		}
+		var heading = all
+			? $"[{provider}] ({resolvedPath}): {discovered.Length} pit(s) found"
+			: $"Found {discovered.Length} pit(s) in cloud '{provider}' ({resolvedPath}):";
+		return string.Join(Environment.NewLine, [heading, .. discovered.Select(name => FormatPitListing(root, name, longListing))]);
+	}
+
+	private static string FormatPitListing(RaiPath? root, string name, bool longListing)
+	{
+		if (!longListing || root is null) return $"  {name}";
+		var pitDirectory = root / name;
+		using var pit = new Pit(pitDirectory, readOnly: true, unflagged: true);
+		var file = pit.JsonFile;
+		return $"  {name,-12}  {FormatPitSize(file.Length),9}   {file.LastWriteTimeUtc.LocalDateTime:yyyy-MM-dd HH:mm}";
+	}
+
+	private static string FormatPitSize(long bytes) => $"{bytes / 1024d:F1} KB";
+
 	private static int RunSeedCommand(string[] args)
 	{
 		var valueOptions = GlobalValueOptions.Concat(["--source"]).ToHashSet(StringComparer.Ordinal);
@@ -589,6 +748,7 @@ internal static class Program
 			throw new ArgumentException("--source - applies to single-pit seed operations, not --wwwa.");
 		if (!wwwa && positionals.Count != 1)
 			throw new ArgumentException("seed requires exactly one <PitName>, or --wwwa for the four-pit source directory.");
+		RequireExplicitMutationLocation(args, "seed");
 
 		return RunMappedArguments(args);
 	}
@@ -678,6 +838,7 @@ internal static class Program
 			throw new ArgumentException("--older-than applies only with --prune-process-flags.");
 		if (repair && !apply)
 			throw new ArgumentException("--repair-legacy-extensions requires --apply.");
+		if (apply) RequireExplicitMutationLocation(args, "maintain");
 		TimeSpan? olderThan = null;
 		if (olderThanText is not null)
 		{
@@ -799,6 +960,42 @@ internal static class Program
 			$"Cannot resolve maintenance target '{target}' without -r or --pitroot, or a configured -c or --cloud provider.");
 	}
 
+	private static void RequireExplicitMutationLocation(string[] args, string command)
+	{
+		var requestedCloud = ParamValue(args, "-c", "--cloudprovider", "--cloud");
+		var root = ParamValue(args, "-r", "--pitroot");
+		if (!string.IsNullOrWhiteSpace(requestedCloud) || string.IsNullOrWhiteSpace(root)) return;
+		if (IsExplicitLocalDirectory(root)) return;
+		throw new ArgumentException(
+			$"{command} refuses to guess a cloud for tenant root '{root}'. Supply -c <provider> or an explicit local directory path.");
+	}
+
+	private static bool IsExplicitLocalDirectory(string root)
+	{
+		if (string.IsNullOrWhiteSpace(root)) return false;
+		try
+		{
+			var localRoot = new RaiPath(root);
+			if (localRoot.Exists()) return true;
+
+			// A seed target may not exist yet. Retain that valid local use case only
+			// when the caller supplied an explicitly qualified RaiPath, never for a
+			// bare tenant name that would otherwise make the cloud choice ambiguous.
+			var supplied = Os.NormSeperator(root.Trim());
+			return supplied == "."
+				|| supplied == "~"
+				|| supplied.StartsWith(Os.DIR, StringComparison.Ordinal)
+				|| supplied.StartsWith("." + Os.DIR, StringComparison.Ordinal)
+				|| supplied.StartsWith("~" + Os.DIR, StringComparison.Ordinal)
+				|| (Os.IsWindows && supplied.Length > 2 && supplied[1] == ':' &&
+					supplied[2..].StartsWith(Os.DIR, StringComparison.Ordinal));
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
 	private static int RunDeleteMutation(
 		string[] args,
 		string pitName,
@@ -807,6 +1004,7 @@ internal static class Program
 	{
 		if (string.IsNullOrWhiteSpace(pitName) || string.IsNullOrWhiteSpace(itemId))
 			throw new ArgumentException("PitName and ItemId must be non-empty values.");
+		RequireExplicitMutationLocation(args, propertyPath is null ? "delete-item" : "delete-property");
 
 		Messages.Debug = HasOption(args, "-b", "--debug");
 		Messages.Banner = !HasOption(args, "-n", "--nologo");
@@ -980,6 +1178,13 @@ internal static class Program
 				"       pits seed --wwwa --source <directory> [global options]",
 				"Imports JSON/JSON5 into one pit or the four WWWA pits.",
 				"--require-existing, --patch  reject missing or tombstoned IDs before opening the Pit for write."
+			},
+			"list" or "ls" => new[]
+			{
+				"Usage: pits list -r <tenant|path> [-c <cloud>] [-a|--all] [-l|--long]",
+				"       pits ls -r <tenant|path> [-c <cloud>] [-a|--all] [-l|--long]",
+				"Lists pits with their cloud and resolved-directory provenance. Without -c, a tenant name scans configured DefaultCloudOrder; a local path remains local.",
+				"-a, --all reports every configured cloud, including clouds with no pits. -l, --long adds size and modification time; -la and -al combine both."
 			},
 			"export" => new[]
 			{
