@@ -1,4 +1,5 @@
 using Newtonsoft.Json.Linq;
+using JsonPit;
 using OsLib;
 using Microsoft.Extensions.Logging;
 
@@ -48,6 +49,36 @@ public sealed class CliSubcommandTests : IDisposable
 
 		Assert.Equal(0, run.exitCode);
 		Assert.Contains("  Object", run.output);
+	}
+
+	[Fact]
+	public void GeneralHelp_ShowsWwwaPitStatusOnlyWhenExplicitOrContextual()
+	{
+		var weather = root / "Weather";
+		weather.mkdir();
+
+		var bareHelp = RunPits("--help", "-n");
+		var weatherHelp = RunPits("--help", "-r", weather.FullPath, "-n");
+		Assert.Equal(0, bareHelp.exitCode);
+		Assert.Equal(0, weatherHelp.exitCode);
+		Assert.DoesNotContain("Person.pit", bareHelp.output);
+		Assert.DoesNotContain("Object.pit", bareHelp.output);
+		Assert.DoesNotContain("Place.pit", bareHelp.output);
+		Assert.DoesNotContain("Activity.pit", bareHelp.output);
+		Assert.DoesNotContain("Person.pit", weatherHelp.output);
+
+		CreatePit(root / "Person", "Person", "WWWA");
+		Assert.True(Messages.HasWwwaPit(root));
+		var contextualHelp = RunPits("--help", "-r", root.FullPath, "-n");
+		var explicitHelp = RunPits("--help", "--wwwa", "-n");
+		var personFile = new PitFile(root / "Person", "Person").FullName;
+
+		Assert.Contains($"{Icons.Info} Person\t{Icons.Success}\t{personFile}", contextualHelp.output);
+		Assert.Contains($"{Icons.Info} Activity\t{Icons.NotAvailable}", contextualHelp.output);
+		Assert.Contains($"{Icons.Info} Person\t{Icons.NotAvailable}\tPerson.pit", explicitHelp.output);
+		Assert.Contains($"{Icons.Info} Object\t{Icons.NotAvailable}\tObject.pit", explicitHelp.output);
+		Assert.Contains($"{Icons.Info} Place\t\t{Icons.NotAvailable}\tPlace.pit", explicitHelp.output);
+		Assert.Contains($"{Icons.Info} Activity\t{Icons.NotAvailable}\tActivity.pit", explicitHelp.output);
 	}
 
 	[Fact]

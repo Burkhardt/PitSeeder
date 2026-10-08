@@ -80,11 +80,7 @@ public static class Messages
 		$"{Icons.Warning} Legacy\t{Icons.Info}\tflat seed/export flags remain supported in 4.x; use command syntax before 5.x",
 		$"{Icons.Info} PitName\t{Icons.File}\t{PitNameDescription()}",
 		$"\t\t{Icons.Info}\tpositional arg: pit to operate on, or target pit name when used with -s",
-		$"\t\t{Icons.Info}\te.g. 'pits -s patch.json5 -r <root> Activity' seeds Activity.pit from patch.json5",
-		$"{Icons.Info} Person\t{WwwaPitStatus("Person")}",
-		$"{Icons.Info} Object\t{WwwaPitStatus("Object")}",
-		$"{Icons.Info} Place\t\t{WwwaPitStatus("Place")}",
-		$"{Icons.Info} Activity\t{WwwaPitStatus("Activity")}",
+		$"\t\t{Icons.Info}\te.g. 'pits -s patch.json5 -r <root> Activity' seeds Activity from patch.json5",
 	];
 	private static string PitRootDescription()
 	{
@@ -187,8 +183,40 @@ public static class Messages
 	{
 		if (PitRoot == null)
 			return $"{Icons.NotAvailable}\t{name}.pit";
-		var pitFile = new PitFile(PitRoot / name, name);
-		return $"{(pitFile.Exists() ? Icons.Success : Icons.NotAvailable)}\t{pitFile.FullName}";
+
+		var pitDirectory = PitRoot / name;
+		var displayFile = new PitFile(pitDirectory, name);
+		if (!pitDirectory.Exists())
+			return $"{Icons.NotAvailable}\t{displayFile.FullName}";
+		try
+		{
+			using var pit = new Pit(pitDirectory, readOnly: true, unflagged: true);
+			return $"{Icons.Success}\t{pit.JsonFile.FullName}";
+		}
+		catch
+		{
+			return $"{Icons.NotAvailable}\t{displayFile.FullName}";
+		}
+	}
+
+	public static bool HasWwwaPit(RaiPath? pitRoot)
+	{
+		if (pitRoot == null) return false;
+		return WwwaFiles.Any(name => IsValidPit(pitRoot / name));
+	}
+
+	private static bool IsValidPit(RaiPath pitDirectory)
+	{
+		if (!pitDirectory.Exists()) return false;
+		try
+		{
+			using var pit = new Pit(pitDirectory, readOnly: true, unflagged: true);
+			return pit.JsonFile.Exists();
+		}
+		catch
+		{
+			return false;
+		}
 	}
 	public static void WriteHighlighted(string text, ConsoleColor foreground = ConsoleColor.Black, ConsoleColor? background = null)
 	{
@@ -217,9 +245,16 @@ public static class Messages
 		Console.Write($"{Icons.Banner} ");
 		WriteLine(text);
 	}
-	public static void WriteHelp()
+	public static void WriteHelp(bool includeWwwaStatus = false)
 	{
 		foreach (var line in Help) WriteSuccess(line + Icons.HelpLineWidthCompensation);
+		if (!includeWwwaStatus) return;
+
+		foreach (var name in WwwaFiles)
+		{
+			var separator = name == "Place" ? "\t\t" : "\t";
+			WriteSuccess($"{Icons.Info} {name}{separator}{WwwaPitStatus(name)}");
+		}
 	}
 }
 
@@ -439,7 +474,7 @@ internal static class Program
 			}
 			if (showHelp || !hasExecutionIntent)
 			{
-				Messages.WriteHelp();
+				Messages.WriteHelp(wwwa || Messages.HasWwwaPit(pitRoot));
 				if (!hasExecutionIntent) return showHelp ? 0 : 1;
 			}
 			#endregion
