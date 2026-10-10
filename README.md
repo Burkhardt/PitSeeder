@@ -24,7 +24,34 @@ Coordinated 4.5.5 release; public behavior is aligned with the synchronized plat
 
 Release notes: [PitSeeder_RELEASE_NOTES_4.5.5.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.5.md).
 
-## 4.5.4
+<details>
+<summary><b>Previous Versions</b></summary>
+
+### 4.5.4
+
+Coordinated 4.5.4 release; public behavior is aligned with the synchronized platform.
+
+Release notes: [PitSeeder_RELEASE_NOTES_4.4.8.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.8.md).
+
+### 4.5.3
+
+Coordinated 4.5.3 release; public behavior is aligned with the synchronized platform.
+
+Release notes: [PitSeeder_RELEASE_NOTES_4.5.3.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.3.md).
+
+### 4.5.2
+
+Coordinated 4.5.2 release; public behavior is aligned with the synchronized platform.
+
+Release notes: [PitSeeder_RELEASE_NOTES_4.5.2.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.2.md).
+
+### 4.5.0
+
+4.5.0 uses live JsonPit property deletion and aligned dependencies; pits reports version 4.5.0.
+
+Release notes: [PitSeeder_RELEASE_NOTES_4.5.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.0.md).
+
+</details>
 
 Coordinated 4.5.4 release; public behavior is aligned with the synchronized platform.
 
@@ -229,18 +256,12 @@ Release notes: [PitSeeder_RELEASE_NOTES_4.4.6.md](https://github.com/Burkhardt/R
 - Aligns fallback dependencies on `JsonPit 4.2.0` and `OsLibCore 4.2.0`; no PitSeeder CLI behavior changes from 4.1.0.
 - Release notes: [PitSeeder_RELEASE_NOTES_4.2.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.0.md)
 
-## Install
+## Installation
 
-After the package is published to NuGet:
+### 1. User Global Tool Install
 
 ```bash
 dotnet tool install --global PitSeeder
-```
-
-On macOS or Linux, a practical option is to install directly into a directory on your `PATH`:
-
-```bash
-sudo dotnet tool install PitSeeder --tool-path /usr/local/bin
 ```
 
 To update:
@@ -249,11 +270,23 @@ To update:
 dotnet tool update --global PitSeeder
 ```
 
-To update an installation in `/usr/local/bin`:
+*(Requires `~/.dotnet/tools` in your `$PATH`)*
+
+### 2. Direct Install to `/usr/local/bin` (Recommended for macOS & Linux)
+
+Install directly to `/usr/local/bin` so no `$PATH` modification is needed:
+
+```bash
+sudo dotnet tool install PitSeeder --tool-path /usr/local/bin
+```
+
+To update:
 
 ```bash
 sudo dotnet tool update PitSeeder --tool-path /usr/local/bin
 ```
+
+> **Note:** `sudo` is only required during installation and updates to write to `/usr/local/bin`. Running the installed CLI command never requires `sudo` or elevated privileges.
 
 ## CLI Reference
 
