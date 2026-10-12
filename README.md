@@ -1,10 +1,10 @@
 # PitSeeder
 
-## Latest Version 4.5.9
+## Latest Version 4.5.10
 
 Cloud-aware JsonPit seeding, discovery, and WWWA command-line workflows.
 
-Latest release notes: [PitSeeder 4.5.9 release notes](https://github.com/Burkhardt/RAIkeep/blob/main/doc/releases/v4.x/PitSeeder_RELEASE_NOTES_4.x.md#459).
+Latest release notes: [PitSeeder 4.5.10 release notes](https://github.com/Burkhardt/RAIkeep/blob/main/doc/releases/v4.x/PitSeeder_RELEASE_NOTES_4.x.md#4510).
 
 ## Previous Versions
 
