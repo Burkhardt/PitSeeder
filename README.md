@@ -1,86 +1,17 @@
 # PitSeeder
 
-## 4.5.8
+## Latest Version 4.5.8
 
-Coordinated 4.5.8 release; public behavior is aligned with the synchronized platform.
+Cloud-aware JsonPit seeding, discovery, and WWWA command-line workflows.
 
-Release notes: [PitSeeder_RELEASE_NOTES_4.5.8.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.8.md).
-
-## 4.5.7
-
-Coordinated 4.5.7 release; public behavior is aligned with the synchronized platform.
-
-Release notes: [PitSeeder_RELEASE_NOTES_4.5.7.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.7.md).
-
-## 4.5.6
-
-Coordinated 4.5.6 release; public behavior is aligned with the synchronized platform.
-
-Release notes: [PitSeeder_RELEASE_NOTES_4.5.6.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.6.md).
-
-## 4.5.5
-
-Coordinated 4.5.5 release; public behavior is aligned with the synchronized platform.
-
-Release notes: [PitSeeder_RELEASE_NOTES_4.5.5.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.5.md).
+Latest release notes: [PitSeeder_RELEASE_NOTES_4.5.8.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.8.md).
 
 <details>
 <summary><b>Previous Versions</b></summary>
 
-### 4.5.4
-
-Coordinated 4.5.4 release; public behavior is aligned with the synchronized platform.
-
-Release notes: [PitSeeder_RELEASE_NOTES_4.4.8.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.8.md).
-
-### 4.5.3
-
-Coordinated 4.5.3 release; public behavior is aligned with the synchronized platform.
-
-Release notes: [PitSeeder_RELEASE_NOTES_4.5.3.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.3.md).
-
-### 4.5.2
-
-Coordinated 4.5.2 release; public behavior is aligned with the synchronized platform.
-
-Release notes: [PitSeeder_RELEASE_NOTES_4.5.2.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.2.md).
-
-### 4.5.0
-
-4.5.0 uses live JsonPit property deletion and aligned dependencies; pits reports version 4.5.0.
-
-Release notes: [PitSeeder_RELEASE_NOTES_4.5.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.0.md).
+Earlier coordinated releases are recorded in the [RAIkeep release-note archive](https://github.com/Burkhardt/RAIkeep/tree/main/doc).
 
 </details>
-
-Coordinated 4.5.4 release; public behavior is aligned with the synchronized platform.
-
-Release notes: [PitSeeder_RELEASE_NOTES_4.5.4.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.4.md).
-
-## 4.5.3
-
-Coordinated 4.5.3 release; public behavior is aligned with the synchronized platform.
-
-Release notes: [PitSeeder_RELEASE_NOTES_4.5.3.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.3.md).
-
-## 4.5.2
-
-Coordinated 4.5.2 release; public behavior is aligned with the synchronized platform.
-
-Release notes: [PitSeeder_RELEASE_NOTES_4.5.2.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.2.md).
-
-## 4.5.0
-
-4.5.0 uses live JsonPit property deletion and aligned dependencies; pits reports version 4.5.0.
-
-Release notes: [PitSeeder_RELEASE_NOTES_4.5.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.0.md).
-
-## 4.4.8
-
-4.4.8 uses live JsonPit property deletion and aligned dependencies; pits reports version 4.4.8.
-
-Release notes: [PitSeeder_RELEASE_NOTES_4.4.8.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.8.md).
-
 
 ## Terminal font
 
@@ -103,158 +34,6 @@ Operational recovery-log guidance: [`PITS-AUDIT.md`](https://github.com/Burkhard
 
 Within this repository, PitSeeder lives under `RAIkeep/PitSeeder` so it can build against the local `JsonPit` and `OsLib` sources before those packages are published.
 
-## 4.4.6
-
-Adds explicit `pits seed <PitName> --source -` ingestion and whole-batch live-ID preflight before writable Pit creation. Typed OsLib callers can provide buffered standard input. Reports `pits v4.4.6`.
-
-Release notes: [PitSeeder_RELEASE_NOTES_4.4.6.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.6.md).
-
-## 4.4.5
-
-- Implements accepted CR047 strict patch mode for `pits seed`.
-- `--require-existing` and its `--patch` alias reject missing or tombstoned IDs
-  before a writable Pit is opened; mixed batches fail atomically.
-- Successful seed operations report the committed payload count. Default
-  no-flag seed/upsert behavior remains backward compatible.
-- Aligns dependencies on `JsonPit 4.4.5` and `OsLibCore 4.4.5`, and reports `pits v4.4.5`.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.4.5.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.5.md)
-
-## 4.4.4
-
-- Implements accepted CR044 missing-configuration guidance: storage commands
-  direct operators to `amafu init` before cloud resolution when the standard
-  RAIkeep configuration is absent.
-- CR043 single-entity, array, and keyed-map seed behavior remains unchanged.
-- Aligns dependencies on `JsonPit 4.4.4` and `OsLibCore 4.4.4`, and reports `pits v4.4.4`.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.4.4.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.4.md)
-
-## 4.4.2
-
-- CR040 rejects seed payloads containing client-supplied `Modified` or `Deleted`
-  before opening the destination pit. `delete-property` rejects `Id`, `Modified`,
-  and `Deleted`; use `delete-item` for the lifecycle transition.
-- CR041 clean change files and their receipts are merged and maintained alongside
-  legacy SHA-suffixed artifacts without an upgrade conversion step.
-- Aligns dependencies on `JsonPit 4.4.2` and `OsLibCore 4.4.2`, and reports `pits v4.4.2`.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.4.2.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.2.md)
-
-## 4.4.1
-
-- Participates in synchronized RAIkeep v4.4.1 CR037/CR037.1.
-- Misplaced reserved verbs fail with exit code `2` and an actionable verb-first
-  correction before pit or filesystem access; version flags take immediate precedence.
-- `pits seed` accepts JSON5 line or block comments before the root array/map.
-- Malformed payloads remain rejected without a catch-all parse retry.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.4.1.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.4.1.md)
-
-## 4.3.2
-
-- Participates unchanged in coordinated RAIkeep v4.3.2.
-- Aligns fallback dependencies on `JsonPit 4.3.2` and `OsLibCore 4.3.2`, and reports `pits v4.3.2`.
-- CR024 clean-exit process-flag behavior remains unchanged.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.3.2.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.3.2.md)
-
-## 4.3.1
-
-- Participates unchanged in coordinated RAIkeep v4.3.1.
-- Aligns fallback dependencies on `JsonPit 4.3.1` and `OsLibCore 4.3.1`, and reports `pits v4.3.1`.
-- CR024 clean-exit process-flag behavior remains unchanged.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.3.1.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.3.1.md)
-
-## 4.3.0
-
-- Carries accepted CR024: finite `pits` calls delete every exact PID-specific process flag they own after normal or exceptional completion.
-- `--retain-window` remains the documented 4.x compatibility exception and is scheduled for removal in the next major release.
-- Aligns fallback dependencies on `JsonPit 4.3.0` and `OsLibCore 4.3.0`, and reports `pits v4.3.0`.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.3.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.3.0.md)
-
-## 4.2.11 (superseded before publication)
-
-- This prepared line was not published; its CR024 changes are carried by v4.3.0.
-- Ctrl+C and process-exit handlers converge on the same `Pit.Dispose()` cleanup; `Master.flag` remains untouched.
-- `--retain-window` remains a documented compatibility exception in v4.2.11 and is scheduled for removal in the next major release.
-- Aligns fallback dependencies on `JsonPit 4.2.11` and `OsLibCore 4.2.11`, and reports `pits v4.2.11`.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.11.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.11.md)
-
-## 4.2.10
-
-- Adds `--archive-events` to `pits maintain` for explicit preview/apply compaction of loose recovery events.
-- Preview reports the exact UTC-range archive and selected files without mutation; `--apply` creates the immutable archive directly inside the existing `Events` directory and retires only validated loose copies.
-- `pits audit` transparently combines loose `.event` files and validated `Events_*.zip` archives with unchanged filters and ordering.
-- Invalid or conflicting evidence is retained and reported; existing archives are never overwritten or replaced.
-- Aligns fallback dependencies on `JsonPit 4.2.10` and `OsLibCore 4.2.10`, and reports `pits v4.2.10`.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.10.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.10.md)
-
-## 4.2.9
-
-- Implements accepted incident corrective action CR022 with maintenance-root validation before any `Pit` is constructed.
-- Report-only and apply modes reject a missing root or a WWWA root containing no expected pits without creating directories or files.
-- Partially populated WWWA roots report and skip missing pits without creating them.
-- Large explicitly applied pruning/legacy-repair runs can trigger a CloudDrive mass-deletion confirmation for the obsolete artifacts reported by the command; review those counts before confirming the provider action.
-- Aligns fallback dependencies on `JsonPit 4.2.9` and `OsLibCore 4.2.9`, and reports `pits v4.2.9`.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.9.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.9.md)
-- Mandatory storage contract: [Cloud-Storage-In-Place-Invariant.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/Cloud-Storage-In-Place-Invariant.md)
-
-## 4.2.8
-
-- Implements accepted CR021 `pits maintain (<PitName> | --wwwa)` with report-only default and explicit `--apply`.
-- Adds machine-readable `--json` reporting, explicit aged process-window pruning, and explicit validated extensionless flag/event repair.
-- Maintenance disposal does not republish retired changes.
-- Aligns fallback dependencies on `JsonPit 4.2.8` and `OsLibCore 4.2.8`, and reports `pits v4.2.8`.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.8.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.8.md)
-
-## 4.2.7
-
-- Aligns PitSeeder with the coordinated seven-package RAIkeep 4.2.7 release implementing accepted CR020.
-- Aligns fallback dependencies on `JsonPit 4.2.7` and `OsLibCore 4.2.7`; `pits` behavior is unchanged.
-- Reports `pits v4.2.7` through the CLI version boundary.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.7.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.7.md)
-
-## 4.2.6
-
-- Aligns PitSeeder with the coordinated seven-package RAIkeep 4.2.6 release implementing accepted CR019.
-- Aligns fallback dependencies on `JsonPit 4.2.6` and `OsLibCore 4.2.6`; `pits` behavior is unchanged.
-- Reports `pits v4.2.6` through the CLI version boundary.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.6.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.6.md)
-
-## 4.2.5
-
-- Implements accepted CR017 with optional `--at <timestamp>` on single-pit and WWWA exports, for both `--json` and `--out-dir`.
-- Requires an explicit `Z` or numeric UTC offset and projects JsonPit history inclusively through that instant.
-- Emits the strict `{ "_export": { "at", "exported" }, "data": ... }` envelope only when `--at` is supplied; existing exports retain their established root shape without it.
-- Aligns fallback dependencies on `JsonPit 4.2.5` and `OsLibCore 4.2.5` and reports `pits v4.2.5`.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.5.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.5.md)
-
-## 4.2.4
-
-- Aligns PitSeeder with the coordinated seven-package RAIkeep 4.2.4 release implementing accepted CR016.
-- Preserves CR015 `delete-property` and `delete-item` behavior unchanged.
-- Aligns fallback dependencies on `JsonPit 4.2.4` and `OsLibCore 4.2.4`.
-- 4.2.4 release notes: [PitSeeder_RELEASE_NOTES_4.2.4.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.4.md)
-
-## 4.2.3
-
-- Implements accepted CR015 `delete-property` and `delete-item` commands.
-- Aligns fallback dependencies on `JsonPit 4.2.3` and `OsLibCore 4.2.3`.
-- Retains the `4.2.1` Nerd Font glyphs, Blink guidance, and terminal clipping tolerance unchanged.
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.3.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.3.md)
-
-## 4.2.1
-
-- Uses glyphs embedded in `JetBrainsMonoNLNerdFontPropo-Regular` for cloud-provider and numbered help options, avoiding fallback-font width differences.
-- Reserves two terminal cells at the end of help lines for renderers such as Blink.
-- Continues to depend on `JsonPit 4.2.0` and `OsLibCore 4.2.0`; no library package version changes are part of this CLI-only patch.
-- Terminal setup guidance: [TERMINAL_FONTS.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/TERMINAL_FONTS.md)
-- Current release notes: [PitSeeder_RELEASE_NOTES_4.2.1.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.1.md)
-
-## 4.2.0
-
-- Retains the command-first `seed`, `export`, and `audit` syntax introduced for CR006.
-- Keeps established flat seed/export invocations working throughout `4.x`; the legacy parser is scheduled for removal in `5.x.x`.
-- Moves the recent `--events`, `--event-machine`, and `--event-level` surface directly to `audit`, `--machine`, and `--level` without a legacy audit mode.
-- Keeps `PitSeeder` last in the coordinated release order, immediately after `ImgSeeder`/`iorg`.
-- Aligns fallback dependencies on `JsonPit 4.2.0` and `OsLibCore 4.2.0`; no PitSeeder CLI behavior changes from 4.1.0.
-- Release notes: [PitSeeder_RELEASE_NOTES_4.2.0.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.2.0.md)
 
 ## Installation
 
@@ -675,9 +454,6 @@ See [BuildFromSource.md](https://github.com/Burkhardt/PitSeeder/blob/main/BuildF
 - packing and publishing the NuGet tool
 - publishing self-contained binaries for macOS, Ubuntu, and Windows
 
-## release notes
-
-- Latest release notes: [PitSeeder_RELEASE_NOTES_4.5.8.md](https://github.com/Burkhardt/RAIkeep/blob/main/doc/PitSeeder_RELEASE_NOTES_4.5.8.md)
 
 ## License
 

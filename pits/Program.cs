@@ -1008,22 +1008,22 @@ internal static class Program
 	private static bool IsExplicitLocalDirectory(string root)
 	{
 		if (string.IsNullOrWhiteSpace(root)) return false;
+		var supplied = Os.NormSeperator(root.Trim());
+		var explicitlyQualified = supplied == "."
+			|| supplied == "~"
+			|| supplied.StartsWith(Os.DIR, StringComparison.Ordinal)
+			|| supplied.StartsWith("." + Os.DIR, StringComparison.Ordinal)
+			|| supplied.StartsWith("~" + Os.DIR, StringComparison.Ordinal)
+			|| (Os.IsWindows && supplied.Length > 2 && supplied[1] == ':' &&
+				supplied[2..].StartsWith(Os.DIR, StringComparison.Ordinal));
+		if (!explicitlyQualified) return false;
+
 		try
 		{
-			var localRoot = new RaiPath(root);
-			if (localRoot.Exists()) return true;
-
-			// A seed target may not exist yet. Retain that valid local use case only
-			// when the caller supplied an explicitly qualified RaiPath, never for a
-			// bare tenant name that would otherwise make the cloud choice ambiguous.
-			var supplied = Os.NormSeperator(root.Trim());
-			return supplied == "."
-				|| supplied == "~"
-				|| supplied.StartsWith(Os.DIR, StringComparison.Ordinal)
-				|| supplied.StartsWith("." + Os.DIR, StringComparison.Ordinal)
-				|| supplied.StartsWith("~" + Os.DIR, StringComparison.Ordinal)
-				|| (Os.IsWindows && supplied.Length > 2 && supplied[1] == ':' &&
-					supplied[2..].StartsWith(Os.DIR, StringComparison.Ordinal));
+			// RaiPath treats a non-terminated final segment as a file name. A command
+			// line root is explicitly a directory, so preserve its final segment.
+			_ = new RaiPath(root.EndsWith(Os.DIR, StringComparison.Ordinal) ? root : root + Os.DIR);
+			return true;
 		}
 		catch
 		{
