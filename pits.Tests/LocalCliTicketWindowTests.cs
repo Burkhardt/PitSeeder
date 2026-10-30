@@ -63,13 +63,16 @@ public sealed class LocalCliTicketWindowTests : IDisposable
 		Assert.Empty(PitsProcessFlags(root / "Person"));
 	}
 
-	[Fact]
-	public void RetainWindowOption_KeepsFiniteCliWindowActive()
+	[Theory]
+	[InlineData("-w")]
+	[InlineData("--window")]
+	[InlineData("--retain-window")]
+	public void RetainWindowOption_KeepsFiniteCliWindowActive(string option)
 	{
 		MasterFlagFile.TicketDuration = TimeSpan.FromMinutes(5);
 		CreatePit("Person", "RetainedPerson");
 
-		var run = RunPits("-n", "-r", root.FullPath, "Person", "--json", "--retain-window");
+		var run = RunPits("export", "Person", "-n", "-r", root.FullPath, "--json", option);
 
 		Assert.Equal(0, run.exitCode);
 		Assert.Contains(PitsProcessFlags(root / "Person"), flag => !flag.IsExpired);

@@ -19,14 +19,19 @@ public sealed class StrictPatchSeedTests : IDisposable
 
 	public void Dispose() => Cleanup();
 
-	[Fact]
-	public void TC01_RequireExisting_CommitsSparsePatchForLivingEntity()
+	[Theory]
+	[InlineData("-x")]
+	[InlineData("--id-exists")]
+	[InlineData("--require-exist")]
+	[InlineData("--require-existing")]
+	[InlineData("--patch")]
+	public void TC01_RequireExisting_CommitsSparsePatchForLivingEntity(string option)
 	{
 		Seed("[{ Id: 'Alice', Kind: 'Person', Name: 'Alice' }]");
 		var patch = Source("tc01", "[{ Id: 'Alice', UseCase: 'Live' }]");
 
 		var run = RunPits("seed", "Person", "--source", patch.FullName,
-			"--require-existing", "-r", root.FullPath, "-n");
+			option, "-r", root.FullPath, "-n");
 
 		Assert.Equal(0, run.exitCode);
 		Assert.Equal("[pits] Successfully committed 1 entity(ies) to Pit 'Person'.",
@@ -49,7 +54,7 @@ public sealed class StrictPatchSeedTests : IDisposable
 		Assert.Equal(1, run.exitCode);
 		Assert.Equal(
 			"error: Entity 'Ghost99' does not exist in Pit 'Person'. " +
-			"Use without --require-existing / --patch to allow creating new entities.",
+			"Use without --id-exists / --patch to allow creating new entities.",
 			run.error.Trim());
 		Assert.Equal(before, SnapshotPitDirectory());
 		Assert.DoesNotContain(Export(), item => item["Id"]?.Value<string>() == "Ghost99");

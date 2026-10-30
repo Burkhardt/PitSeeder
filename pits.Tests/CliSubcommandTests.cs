@@ -60,6 +60,18 @@ public sealed class CliSubcommandTests : IDisposable
 		var bareHelp = RunPits("--help", "-n");
 		var weatherHelp = RunPits("--help", "-r", weather.FullPath, "-n");
 		Assert.Equal(0, bareHelp.exitCode);
+		Assert.DoesNotContain("\t", bareHelp.output);
+		Assert.DoesNotContain("\u001b", bareHelp.output, StringComparison.Ordinal);
+		Assert.Contains("-x, --id-exists", bareHelp.output);
+		Assert.Contains("-w, --window", bareHelp.output);
+		Assert.DoesNotContain("--retain-window", bareHelp.output);
+		Assert.DoesNotContain("--require-exist", bareHelp.output);
+		Assert.DoesNotContain("positional argument:", bareHelp.output);
+		var namedHelp = RunPits("Activity", "--help", "-r", root.FullPath, "-n");
+		Assert.Equal(0, namedHelp.exitCode);
+		Assert.Contains("positional argument:", namedHelp.output);
+		Assert.Contains("pits seed Activity --source", namedHelp.output);
+		Assert.DoesNotContain("--require-existing", bareHelp.output);
 		Assert.Equal(0, weatherHelp.exitCode);
 		Assert.DoesNotContain("Person.pit", bareHelp.output);
 		Assert.DoesNotContain("Object.pit", bareHelp.output);
@@ -73,12 +85,12 @@ public sealed class CliSubcommandTests : IDisposable
 		var explicitHelp = RunPits("--help", "--wwwa", "-n");
 		var personFile = new PitFile(root / "Person", "Person").FullName;
 
-		Assert.Contains($"{Icons.Info} Person\t{Icons.Success}\t{personFile}", contextualHelp.output);
-		Assert.Contains($"{Icons.Info} Activity\t{Icons.NotAvailable}", contextualHelp.output);
-		Assert.Contains($"{Icons.Info} Person\t{Icons.NotAvailable}\tPerson.pit", explicitHelp.output);
-		Assert.Contains($"{Icons.Info} Object\t{Icons.NotAvailable}\tObject.pit", explicitHelp.output);
-		Assert.Contains($"{Icons.Info} Place\t\t{Icons.NotAvailable}\tPlace.pit", explicitHelp.output);
-		Assert.Contains($"{Icons.Info} Activity\t{Icons.NotAvailable}\tActivity.pit", explicitHelp.output);
+		Assert.Contains($"{Icons.Info} Person".PadRight(15) + $"  {Icons.Success}   {personFile}", contextualHelp.output);
+		Assert.Contains($"{Icons.Info} Activity".PadRight(15) + $"  {Icons.NotAvailable}", contextualHelp.output);
+		Assert.Contains($"{Icons.Info} Person".PadRight(15) + $"  {Icons.NotAvailable}   Person.pit", explicitHelp.output);
+		Assert.Contains($"{Icons.Info} Object".PadRight(15) + $"  {Icons.NotAvailable}   Object.pit", explicitHelp.output);
+		Assert.Contains($"{Icons.Info} Place".PadRight(15) + $"  {Icons.NotAvailable}   Place.pit", explicitHelp.output);
+		Assert.Contains($"{Icons.Info} Activity".PadRight(15) + $"  {Icons.NotAvailable}   Activity.pit", explicitHelp.output);
 	}
 
 	[Fact]
@@ -617,7 +629,7 @@ public sealed class CliSubcommandTests : IDisposable
 			_ => throw new Xunit.Sdk.XunitException($"Unexpected configured cloud provider: {firstProvider}")
 		};
 		Assert.Contains(providerIcon, cloudLine, StringComparison.Ordinal);
-		Assert.EndsWith("  ", cloudLine, StringComparison.Ordinal);
+		Assert.DoesNotContain("\t", cloudLine);
 	}
 
 	[Theory]
@@ -653,7 +665,7 @@ public sealed class CliSubcommandTests : IDisposable
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.5.14", run.output.Trim());
+		Assert.Equal("pits v4.5.15", run.output.Trim());
 	}
 
 	[Fact]
@@ -676,7 +688,7 @@ public sealed class CliSubcommandTests : IDisposable
 		var run = RunPits(args);
 
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.5.14", run.output.Trim());
+		Assert.Equal("pits v4.5.15", run.output.Trim());
 		Assert.Empty(run.error);
 	}
 

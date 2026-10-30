@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Text;
 using JsonPit;
 using Microsoft.Extensions.Logging;
 using OsLib;
@@ -25,7 +26,6 @@ public static class Icons
 	public const string GoogleDriveBoxOutline = "\U000F0BFD";
 	public const string ICloudDriveBoxOutline = "\U000F0C03";
 	public const string OneDriveBoxOutline = "\U000F0C15";
-	public const string HelpLineWidthCompensation = "  ";
 	public static readonly string[] NumberBoxOutlines =
 	[
 		"\U000F03A6", "\U000F03A9", "\U000F03AC", "\U000F03AE", "\U000F03B0",
@@ -53,67 +53,105 @@ public static class Messages
 	public static bool Banner { get; set; }
 	public static bool RetainWindow { get; set; }
 	public static bool Events { get; set; }
-	public static string[] Help =>
+	private sealed record HelpRow(string Label, char Icon, string Description)
+	{
+		public bool CloudOptions { get; init; }
+	}
+	private const string Cyan = "36";
+	private const string Yellow = "33";
+	private const string Green = "32";
+	private static readonly string[] CommandHelp =
 	[
-		$"Commands:\t{Icons.Info}\tlist (ls), seed, export, audit, delete-property, delete-item, maintain",
-		$"  pits list -r <tenant|path> [-c <cloud>] [-a|--all] [-l|--long]",
-		$"  pits seed <PitName> --source <file|-> [--require-existing|--patch]",
-		$"  pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [--at <ISO-8601 timestamp>]",
-		$"  pits audit <PitName> [--machine <all|local|name>] [--level <severity>] [--json]",
-		$"  pits delete-property <PitName> <ItemId> <PropertyPath>",
-		$"  pits delete-item <PitName> <ItemId>",
-		$"  pits maintain (<PitName> | --wwwa) [--apply] [--archive-events] [--json]",
-		$"-h, --help\t{Icons.Help}\tprint out all options",
-		$"-v, --version\t{Icons.Info}\tprint version info",
-		$"-n, --nologo\t{(Banner ? Icons.Banner : Icons.NoBanner)}\tdo not display the banner",
-		$"-b, --debug\t{Icons.Info}\tenable debug output",
-		$"-r, --pitroot\t{Icons.Folder}\t{PitRootDescription()}",
-		$"-c, --cloud\t{CloudIcon()}\t{CloudDescription()}",
-		$"-s, --source\t{Icons.File}\t{SourceDescription()}",
-		$"-e, --export\t{Icons.Download}\t{ExportDescription()}",
-		$"--json\t\t{(Json ? Icons.Success : Icons.NotAvailable)}\texport to stdout (for piping to jq, grep, etc.)",
-		$"--at\t\t{Icons.Info}\tproject export history at an offset-explicit ISO-8601 timestamp",
-		$"--wwwa\t\t{(Wwwa ? Icons.Success : Icons.NotAvailable)}\toperate on all 4 pits (Person, Object, Place, Activity)",
-		$"--retain-window\t{Icons.Info}\t4.x compatibility: keep the activity window until timeout",
-		$"--require-existing\t{Icons.Info}\tseed only: require every ID to exist in living state",
-		$"--patch\t\t{Icons.Info}\talias for --require-existing",
-		$"{Icons.Warning} Legacy\t{Icons.Info}\tflat seed/export flags remain supported in 4.x; use command syntax before 5.x",
-		$"{Icons.Info} PitName\t{Icons.File}\t{PitNameDescription()}",
-		$"\t\t{Icons.Info}\tpositional arg: pit to operate on, or target pit name when used with -s",
-		$"\t\t{Icons.Info}\te.g. 'pits -s patch.json5 -r <root> Activity' seeds Activity from patch.json5",
+		"pits list -r <tenant|path> [-c <cloud>] [-a|--all] [-l|--long]",
+		"pits seed <PitName> --source <file|-> [-x|--id-exists|--patch]",
+		"pits export (<PitName>|--wwwa) (--out-dir <dir>|--json) [--at <ISO-8601 timestamp>]",
+		"pits audit <PitName> [--machine <all|local|name>] [--level <severity>] [--json]",
+		"pits delete-property <PitName> <ItemId> <PropertyPath>",
+		"pits delete-item <PitName> <ItemId>",
+		"pits maintain (<PitName>|--wwwa) [--apply] [--archive-events] [--json]"
 	];
+	private static HelpRow[] OptionHelp =>
+	[
+		new("-h, --help", Icons.Help, "print out all options"),
+		new("-v, --version", Icons.Info, "print version info"),
+		new("-n, --nologo", Banner ? Icons.Banner : Icons.NoBanner, "do not display the banner"),
+		new("-b, --debug", Icons.Info, "enable debug output"),
+		new("-r, --pitroot", Icons.Folder, PitRootDescription()),
+		new("-c, --cloud", Icons.Folder, CloudDescription()) { CloudOptions = true },
+		new("-s, --source", Icons.File, SourceDescription()),
+		new("-e, --export", Icons.Download, ExportDescription()),
+		new("--json", Json ? Icons.Success : Icons.NotAvailable, "export to stdout (for piping to jq, grep, etc.)"),
+		new("--at", Icons.Info, "project export history at an offset-explicit ISO-8601 timestamp"),
+		new("--wwwa", Wwwa ? Icons.Success : Icons.NotAvailable, "operate on all 4 pits (Person, Object, Place, Activity)"),
+		new("-w, --window", Icons.Info, "keep the activity window until timeout"),
+		new("-x, --id-exists", Icons.Info, "seed only: require every ID to exist in living state"),
+		new("--patch", Icons.Info, "alias for --id-exists"),
+		new($"{Icons.Info} PitName", Icons.File, PitNameDescription()),
+	];
+
+	public static string[] Help => FormatHelp();
+
+	private static string PadHelpField(string value, int width) => CliHelpStyle.Pad(value, width);
+	private static string GlyphColor(char icon) => CliHelpStyle.GlyphColor(icon.ToString());
+	private static bool HelpUsesColor => CliHelpStyle.UseColor();
+	private static string Paint(string text, string color, bool useColor) => CliHelpStyle.Paint(text, color, useColor);
+
+	internal static string[] FormatHelp(bool includeWwwaStatus = false, bool useColor = false)
+	{
+		var options = OptionHelp;
+		var rows = options.ToList();
+		if (includeWwwaStatus)
+		{
+			foreach (var name in WwwaFiles)
+			{
+				var (icon, path) = WwwaPitStatus(name);
+				rows.Add(new($"{Icons.Info} {name}", icon, path));
+			}
+		}
+
+		var labelWidth = rows.Max(row => row.Label.EnumerateRunes().Count());
+		string FormatRow(HelpRow row) =>
+			$"{HelpSyntax.Format(PadHelpField(row.Label, labelWidth), GlyphColor(row.Icon), useColor)}  " +
+			$"{Paint(PadHelpField(row.Icon.ToString(), 2), GlyphColor(row.Icon), useColor)}  " +
+			(row.CloudOptions ? CloudDescription(useColor) : HelpSyntax.Format(row.Description, GlyphColor(row.Icon), useColor));
+		var lines = new List<string>
+		{
+			FormatRow(new("Commands:", Icons.Info,
+				"list, seed, export, audit, delete-property, delete-item, maintain"))
+		};
+		foreach (var command in CommandHelp)
+			lines.Add("  " + HelpSyntax.Format(command, Cyan, useColor));
+		lines.Add("");
+		lines.Add(Paint("Options:", Cyan, useColor));
+		lines.AddRange(rows.Take(options.Length).Select(FormatRow));
+		if (includeWwwaStatus)
+		{
+			lines.Add("");
+			lines.Add(Paint("WWWA pits:", Cyan, useColor));
+			lines.AddRange(rows.Skip(options.Length).Select(FormatRow));
+		}
+		if (!string.IsNullOrWhiteSpace(PitName))
+		{
+			lines.Add("");
+			lines.Add(Paint("Pit argument:", Cyan, useColor));
+			lines.Add(FormatRow(new("", Icons.Info, "positional argument: select one pit for the chosen command")));
+			lines.Add(FormatRow(new("", Icons.Info,
+				$"e.g. 'pits seed {PitName} --source patch.json5 -r <root>' seeds {PitName} from patch.json5")));
+		}
+
+		return lines.ToArray();
+	}
 	private static string PitRootDescription()
 	{
 		return PitRoot != null
 			? PitRoot.FullPath
 			: "root directory containing pits";
 	}
-	private static string CloudDescription()
-	{
-		var options = CloudProviderOptions();
-		return options.Length > 0
-			? string.Join(", ", options.Select((name, index) =>
-				$"{CloudProviderIcon(name, index + 1)} {name}"))
-			: "no DefaultCloudOrder providers are configured";
-	}
-	private static string CloudIcon()
-	{
-		var options = CloudProviderOptions();
-		var provider = options.FirstOrDefault(option =>
-			string.Equals(option, CloudProvider, StringComparison.OrdinalIgnoreCase));
-		return provider != null ? CloudProviderIcon(provider, Array.IndexOf(options, provider) + 1) : Icons.Folder.ToString();
-	}
-	private static string CloudProviderIcon(string provider, int fallbackNumber)
-		=> provider.ToLowerInvariant() switch
-		{
-			"dropbox" => Icons.DropboxBoxOutline,
-			"googledrive" => Icons.GoogleDriveBoxOutline,
-			"iclouddrive" => Icons.ICloudDriveBoxOutline,
-			"onedrive" => Icons.OneDriveBoxOutline,
-			_ => fallbackNumber is > 0 and <= 9
-				? Icons.NumberBoxOutlines[fallbackNumber - 1]
-				: $"({fallbackNumber})"
-		};
+	private static string CloudDescription(bool useColor = false)
+		=> FormatCloudOptions(CloudProviderOptions(), useColor);
+
+	internal static string FormatCloudOptions(IReadOnlyList<string> options, bool useColor)
+		=> CliHelpStyle.CloudOptions(options, useColor);
 	internal static string[] CloudProviderOptions()
 	{
 		var defaultCloudOrder = new List<string>();
@@ -179,23 +217,23 @@ public static class Messages
 			? PitName
 			: "pit to operate on or seed target (e.g., Activity)";
 	}
-	private static string WwwaPitStatus(string name)
+	private static (char Icon, string Path) WwwaPitStatus(string name)
 	{
 		if (PitRoot == null)
-			return $"{Icons.NotAvailable}\t{name}.pit";
+			return (Icons.NotAvailable, $"{name}.pit");
 
 		var pitDirectory = PitRoot / name;
 		var displayFile = new PitFile(pitDirectory, name);
 		if (!pitDirectory.Exists())
-			return $"{Icons.NotAvailable}\t{displayFile.FullName}";
+			return (Icons.NotAvailable, displayFile.FullName);
 		try
 		{
 			using var pit = new Pit(pitDirectory, readOnly: true, unflagged: true);
-			return $"{Icons.Success}\t{pit.JsonFile.FullName}";
+			return (Icons.Success, pit.JsonFile.FullName);
 		}
 		catch
 		{
-			return $"{Icons.NotAvailable}\t{displayFile.FullName}";
+			return (Icons.NotAvailable, displayFile.FullName);
 		}
 	}
 
@@ -239,23 +277,22 @@ public static class Messages
 	}
 	public static void WriteBanner(string text)
 	{
-		Console.Write($"{Icons.Banner} ");
-		WriteLine(text);
-		Console.WriteLine(text);
-		Console.Write($"{Icons.Banner} ");
-		WriteLine(text);
+		foreach (var line in FormatBanner(text, HelpUsesColor)) Console.WriteLine(line);
+	}
+	internal static string[] FormatBanner(string text, bool useColor)
+	{
+		return CliHelpStyle.Banner(text, useColor);
 	}
 	public static void WriteHelp(bool includeWwwaStatus = false)
 	{
-		foreach (var line in Help) WriteSuccess(line + Icons.HelpLineWidthCompensation);
-		if (!includeWwwaStatus) return;
-
-		foreach (var name in WwwaFiles)
-		{
-			var separator = name == "Place" ? "\t\t" : "\t";
-			WriteSuccess($"{Icons.Info} {name}{separator}{WwwaPitStatus(name)}");
-		}
+		foreach (var line in FormatHelp(includeWwwaStatus, HelpUsesColor))
+			Console.WriteLine(line);
 	}
+	internal static void WriteCommandHelpLine(string line)
+	{
+		Console.WriteLine(HelpSyntax.Format(line, Cyan, HelpUsesColor));
+	}
+
 }
 
 internal sealed class StrictPatchValidationException(string message) : Exception(message);
@@ -315,8 +352,8 @@ internal static class Program
 			bool showHelp = HasOption(args, "-h", "--help");
 			bool wwwa = Messages.Wwwa = HasOption(args, "-wwwa", "--wwwa");
 			bool json = Messages.Json = HasOption(args, "--json");
-			bool requireExisting = HasOption(args, "--require-existing", "--patch");
-			Messages.RetainWindow = HasOption(args, "--retain-window");
+			bool requireExisting = HasOption(args, "-x", "--id-exists", "--require-exist", "--require-existing", "--patch");
+			Messages.RetainWindow = HasOption(args, "-w", "--window", "--retain-window");
 			bool events = Messages.Events = HasOption(args, "--events");
 			string? eventMachine = ParamValue(args, "--event-machine");
 			string? eventLevel = ParamValue(args, "--event-level");
@@ -461,7 +498,7 @@ internal static class Program
 			#endregion
 			#region LOGGING & HELP
 			if (Messages.Banner)
-				Messages.WriteBanner($"{Icons.Info} AfricaStage Pit Seeder CLI");
+				Messages.WriteBanner($"{Icons.Info} Pit Seeder CLI ({GetVersion()})");
 			if (hasExecutionIntent)
 			{
 				Messages.WriteDebug($"PitRoot: {pitRoot?.FullPath}");
@@ -766,11 +803,11 @@ internal static class Program
 	{
 		var valueOptions = GlobalValueOptions.Concat(["--source"]).ToHashSet(StringComparer.Ordinal);
 		var allowed = GlobalSwitchOptions.Concat(valueOptions).Concat([
-			"--wwwa", "--require-existing", "--patch"
+			"--wwwa", "-x", "--id-exists", "--require-exist", "--require-existing", "--patch"
 		]).ToHashSet(StringComparer.Ordinal);
 		var positionals = ValidateCommandTokens(args, allowed, valueOptions);
 		var wwwa = HasOption(args, "--wwwa");
-		var requireExisting = HasOption(args, "--require-existing", "--patch");
+		var requireExisting = HasOption(args, "-x", "--id-exists", "--require-exist", "--require-existing", "--patch");
 		var source = ParamValue(args, "--source");
 
 		if (string.IsNullOrWhiteSpace(source))
@@ -778,7 +815,7 @@ internal static class Program
 		if (wwwa && positionals.Count > 0)
 			throw new ArgumentException("seed accepts either <PitName> or --wwwa, not both.");
 		if (wwwa && requireExisting)
-			throw new ArgumentException("--require-existing / --patch applies to single-pit seed operations, not --wwwa.");
+			throw new ArgumentException("--id-exists / --patch applies to single-pit seed operations, not --wwwa.");
 		if (wwwa && source == "-")
 			throw new ArgumentException("--source - applies to single-pit seed operations, not --wwwa.");
 		if (!wwwa && positionals.Count != 1)
@@ -884,11 +921,11 @@ internal static class Program
 
 		Messages.Debug = HasOption(args, "-b", "--debug");
 		Messages.Banner = !json && !HasOption(args, "-n", "--nologo");
-		Messages.RetainWindow = HasOption(args, "--retain-window");
+		Messages.RetainWindow = HasOption(args, "-w", "--window", "--retain-window");
 		var root = ResolveCommandPitRoot(args, wwwa ? "WWWA" : positionals[0]);
 		Messages.PitRoot = root;
 		Messages.Wwwa = wwwa;
-		if (Messages.Banner) Messages.WriteBanner($"{Icons.Info} AfricaStage Pit Seeder CLI");
+		if (Messages.Banner) Messages.WriteBanner($"{Icons.Info} Pit Seeder CLI ({GetVersion()})");
 
 		var options = new PitMaintenanceOptions
 		{
@@ -1043,7 +1080,7 @@ internal static class Program
 
 		Messages.Debug = HasOption(args, "-b", "--debug");
 		Messages.Banner = !HasOption(args, "-n", "--nologo");
-		Messages.RetainWindow = HasOption(args, "--retain-window");
+		Messages.RetainWindow = HasOption(args, "-w", "--window", "--retain-window");
 		var requestedCloudProvider = ParamValue(args, "-c", "--cloudprovider", "--cloud");
 		var cloudProvider = Messages.CloudProvider = ResolveCloudProvider(requestedCloudProvider);
 		var pitRootParam = ParamValue(args, "-r", "--pitroot");
@@ -1071,7 +1108,7 @@ internal static class Program
 		Messages.PitRoot = pitRoot;
 		Messages.PitName = pitName;
 		if (Messages.Banner)
-			Messages.WriteBanner($"{Icons.Info} AfricaStage Pit Seeder CLI");
+			Messages.WriteBanner($"{Icons.Info} Pit Seeder CLI ({GetVersion()})");
 
 		var pitFile = new PitFile(pitRoot / pitName, pitName);
 		if (!pitFile.Exists())
@@ -1128,7 +1165,7 @@ internal static class Program
 
 	private static readonly string[] GlobalSwitchOptions =
 	[
-		"-h", "--help", "-v", "--version", "-b", "--debug", "-n", "--nologo", "--retain-window"
+		"-h", "--help", "-v", "--version", "-b", "--debug", "-n", "--nologo", "-w", "--window", "--retain-window"
 	];
 
 	private static List<string> ValidateCommandTokens(
@@ -1209,10 +1246,10 @@ internal static class Program
 		{
 			"seed" => new[]
 			{
-				"Usage: pits seed <PitName> --source <file|-> [--require-existing|--patch] [global options]",
+				"Usage: pits seed <PitName> --source <file|-> [-x|--id-exists|--patch] [global options]",
 				"       pits seed --wwwa --source <directory> [global options]",
 				"Imports JSON/JSON5 into one pit or the four WWWA pits.",
-				"--require-existing, --patch  reject missing or tombstoned IDs before opening the Pit for write."
+				"-x, --id-exists, --patch    reject missing or tombstoned IDs before opening the Pit for write."
 			},
 			"list" or "ls" => new[]
 			{
@@ -1223,13 +1260,13 @@ internal static class Program
 			},
 			"export" => new[]
 			{
-				"Usage: pits export (<PitName> | --wwwa) (--out-dir <dir> | --json) [--at <ISO-8601 timestamp>] [global options]",
+				"Usage: pits export (<PitName>|--wwwa) (--out-dir <dir>|--json) [--at <ISO-8601 timestamp>] [global options]",
 				"Exports one pit or a resolved WWWA projection to files or standard output.",
 				"--at requires Z or a numeric UTC offset and emits the CR017 _export/data envelope."
 			},
 			"audit" => new[]
 			{
-				"Usage: pits audit (<PitName> | --wwwa) [--machine <all|local|name>] [--level <severity>] [--json] [global options]",
+				"Usage: pits audit (<PitName>|--wwwa) [--machine <all|local|name>] [--level <severity>] [--json] [global options]",
 				"Reads durable events without opening a Pit or creating coordination artifacts."
 			},
 			"delete-property" => new[]
@@ -1244,7 +1281,7 @@ internal static class Program
 			},
 			"maintain" => new[]
 			{
-				"Usage: pits maintain (<PitName> | --wwwa) [--apply] [--archive-events] [--json] [global options]",
+				"Usage: pits maintain (<PitName>|--wwwa) [--apply] [--archive-events] [--json] [global options]",
 				"       [--prune-process-flags --older-than <duration>] [--repair-legacy-extensions]",
 				"--archive-events previews the immutable same-directory archive; add --apply to create it and retire validated loose copies.",
 				"Reports restart-safe change/receipt cleanup; --apply performs only explicitly authorized maintenance."
@@ -1252,8 +1289,8 @@ internal static class Program
 			_ => Array.Empty<string>()
 		};
 		foreach (var line in lines)
-			Messages.WriteSuccess(line);
-		Messages.WriteInfo("Global options: -r|--pitroot, -c|--cloud, -b|--debug, -n|--nologo, --retain-window");
+			Messages.WriteCommandHelpLine(line);
+		Messages.WriteCommandHelpLine("Global options: -r|--pitroot, -c|--cloud, -b|--debug, -n|--nologo, -w|--window");
 	}
 	#region Helpers for argument parsing
 	private static readonly string[] SwitchesWithValues = { "-s", "--source", "-r", "--pitroot", "-e", "--export", "-c", "--cloudprovider", "--cloud", "--event-machine", "--event-level", "--at", "--older-than" };
@@ -1427,7 +1464,7 @@ internal static class Program
 			if (!livingState.Contains(id, withDeleted: false))
 				throw new StrictPatchValidationException(
 					$"Entity '{id}' does not exist in Pit '{pitFile.Name}'. " +
-					"Use without --require-existing / --patch to allow creating new entities.");
+					"Use without --id-exists / --patch to allow creating new entities.");
 		}
 	}
 

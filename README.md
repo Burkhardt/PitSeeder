@@ -1,10 +1,11 @@
 # PitSeeder
 
-## Latest Version 4.5.14
+## Latest Version 4.5.15
 
-Cloud-aware JsonPit seeding, discovery, and WWWA command-line workflows.
+Help now follows the shared CLI theme. Use -w/--window and -x/--id-exists;
+previous spellings remain accepted as unadvertised compatibility aliases.
 
-Latest release notes: [PitSeeder 4.5.14 release notes](https://github.com/Burkhardt/RAIkeep/blob/main/doc/releases/v4.x/PitSeeder_RELEASE_NOTES_4.x.md#4514).
+Latest release notes: [PitSeeder 4.5.15 release notes](https://github.com/Burkhardt/RAIkeep/blob/main/doc/releases/v4.x/PitSeeder_RELEASE_NOTES_4.x.md#4515).
 
 ## Previous Versions
 
@@ -84,7 +85,7 @@ pits maintain (<PitName> | --wwwa) [--apply] [--archive-events] [--json] [global
 | `-b`, `--debug` | Enable debug output |
 | `-r`, `--pitroot` | Root directory containing pits; when used with `-c`, this is relative to the configured cloud root |
 | `-c`, `--cloud` | Cloud provider name (looks up root in `~/.config/RAIkeep.json5`) |
-| `--retain-window` | 4.x compatibility exception: keep this CLI process activity window until timeout; scheduled for removal in the next major release |
+| `-w`, `--window` | Keep this CLI process activity window until timeout |
 
 `--source` belongs to `seed`; `--out-dir` and `--at` belong to `export`; `--machine` and
 `--level` belong to `audit`. `--json` is available on `export`, `audit`, and `maintain`.
@@ -219,7 +220,7 @@ syntax is preferred for new scripts. The `5.x.x` line will require subcommands.
 
 ## Process-window lifecycle
 
-Finite `pits` commands dispose their pits through JsonPit's durability boundary by default after normal completion and when execution unwinds through an exception: accepted fragments are exported as collision-safe change files before the process activity window is released. Ctrl+C and process exit also attempt this cleanup. Use `--retain-window` only when the prior timeout-based activity behavior is explicitly required; it is a v4.3.0 compatibility exception scheduled for removal in the next major release.
+Finite `pits` commands dispose their pits through JsonPit's durability boundary by default after normal completion and when execution unwinds through an exception: accepted fragments are exported as collision-safe change files before the process activity window is released. Ctrl+C and process exit also attempt this cleanup. Use `-w` / `--window` when the activity window should remain until timeout. The previous `--retain-window` spelling remains accepted for compatibility.
 
 Each invocation uses `{MachineName}-pits-{PID}.flag`. Release succeeds only while the flag content still identifies that OS process, then removes that exact file through `RaiFile.rm()` (including the cloud disappearance wait). Another process's activity flag cannot be released. A crash or forced termination can still leave its flag for TTL-based inspection and explicit maintenance pruning.
 
