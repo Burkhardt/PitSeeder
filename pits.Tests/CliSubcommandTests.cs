@@ -665,7 +665,7 @@ public sealed class CliSubcommandTests : IDisposable
 	{
 		var run = RunPits("--version");
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.5.15", run.output.Trim());
+		Assert.Equal("pits v4.5.16", run.output.Trim());
 	}
 
 	[Fact]
@@ -688,7 +688,7 @@ public sealed class CliSubcommandTests : IDisposable
 		var run = RunPits(args);
 
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("pits v4.5.15", run.output.Trim());
+		Assert.Equal("pits v4.5.16", run.output.Trim());
 		Assert.Empty(run.error);
 	}
 
