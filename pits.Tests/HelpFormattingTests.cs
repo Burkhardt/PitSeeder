@@ -144,7 +144,7 @@ public sealed class HelpFormattingTests
 		Assert.All(Decode(colored[1]), cell => Assert.True(cell.Bold));
 		Assert.All(Decode(colored[0]), cell => Assert.False(cell.Bold));
 		var longTitle = $"{Icons.Info} " + new string('x', 80);
-		Assert.Equal(longTitle.Length, Strip(Messages.FormatBanner(longTitle, useColor: true)[0]).Length);
+		Assert.Equal($"{longTitle} on {Environment.MachineName}".Length, Strip(Messages.FormatBanner(longTitle, useColor: true)[0]).Length);
 	}
 
 	private static string Strip(string text) => Regex.Replace(text, @"\x1b\[[0-9;]*m", "");

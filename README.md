@@ -1,11 +1,10 @@
 # PitSeeder
 
-## Latest Version 4.5.17
+## Latest Version 4.5.18
 
-Help now follows the shared CLI theme. Use -w/--window and -x/--id-exists;
-previous spellings remain accepted as unadvertised compatibility aliases.
+Show the executing machine as "on <machine>" in the CLI banner. Size both decorative rules to the complete heading, including the hostname; preserve bold cyan styling and plain redirected output.
 
-Latest release notes: [PitSeeder 4.5.17 release notes](https://github.com/Burkhardt/RAIkeep/blob/main/doc/releases/v4.x/PitSeeder_RELEASE_NOTES_4.x.md#4517).
+Latest release notes: [PitSeeder 4.5.18 release notes](https://github.com/Burkhardt/RAIkeep/blob/main/doc/releases/v4.x/PitSeeder_RELEASE_NOTES_4.x.md#4518).
 
 ## Previous Versions
 

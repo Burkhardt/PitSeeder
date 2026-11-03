@@ -281,7 +281,7 @@ public static class Messages
 	}
 	internal static string[] FormatBanner(string text, bool useColor)
 	{
-		return CliHelpStyle.Banner(text, useColor);
+		return CliHelpStyle.Banner($"{text} on {Environment.MachineName}", useColor);
 	}
 	public static void WriteHelp(bool includeWwwaStatus = false)
 	{
