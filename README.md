@@ -1,10 +1,33 @@
 # PitSeeder
 
-## Latest Version 4.6.1
+## CR081 seed disposition receipt (4.6.2 candidate)
+
+Seed receipts count source entries, including repeated IDs, using the engine's
+accepted-fragment result:
+
+```text
+[pits] 3 source items: 1 written, 2 unchanged (Pit 'Object').
+[pits] 3 source items: 0 written, 3 unchanged (Pit 'Object').
+```
+
+A no-op exits 0. `--debug` / `-b` lists unchanged IDs on stderr. “Written” means
+newly accepted source fragments whose required local persistence completed;
+it is neither a physical file-write count nor confirmation of cloud replication.
+The success line follows Save and required disposal/process-window cleanup.
+Persistence failures return nonzero without that receipt. `--window` retains its
+existing explicit opt-out from window release; Save must still succeed.
+
+All source entries and strict `-x` / `--id-exists` / `--patch` targets are validated
+before mutation. Equality is against the latest fragment ignoring Modified,
+not against the projected state. A sparse patch matching projected values may
+therefore still append a fragment; distributed ordering and tombstones are preserved.
+
+
+## Latest Version 4.6.2
 
 Show the executing machine as "on <machine>" in the CLI banner. Size both decorative rules to the complete heading, including the hostname; preserve bold cyan styling and plain redirected output.
 
-Latest release notes: [PitSeeder 4.6.1 release notes](https://github.com/Burkhardt/RAIkeep/blob/main/doc/releases/v4.x/PitSeeder_RELEASE_NOTES_4.x.md#461).
+Latest release notes: [PitSeeder 4.6.2 release notes](https://github.com/Burkhardt/RAIkeep/blob/main/doc/releases/v4.x/PitSeeder_RELEASE_NOTES_4.x.md#462).
 
 ## Previous Versions
 

@@ -584,6 +584,11 @@ internal static class Program
 		{
 			Console.Error.WriteLine($"error: {ex.Message}");
 		}
+		catch (System.IO.IOException ex)
+		{
+			Console.Error.WriteLine($"error: {ex.Message}");
+			return 1;
+		}
 		catch (JsonPitException ex)
 		{
 			Console.Error.WriteLine($"Error: {ex.Message}");
@@ -599,7 +604,7 @@ internal static class Program
 		return 1;
 	}
 
-	private static int RunCommand(string command, string[] args)
+	internal static int RunCommand(string command, string[] args, Func<int>? seedOperation = null)
 	{
 		try
 		{
@@ -612,7 +617,7 @@ internal static class Program
 			return command switch
 			{
 				"list" or "ls" => RunListCommand(args),
-				"seed" => RunSeedCommand(args),
+				"seed" => seedOperation is null ? RunSeedCommand(args) : seedOperation(),
 				"export" => RunExportCommand(args),
 				"audit" => RunAuditCommand(args),
 				"delete-property" => RunDeletePropertyCommand(args),
@@ -622,6 +627,11 @@ internal static class Program
 			};
 		}
 		catch (StrictPatchValidationException ex)
+		{
+			Console.Error.WriteLine($"error: {ex.Message}");
+			return 1;
+		}
+		catch (System.IO.IOException ex)
 		{
 			Console.Error.WriteLine($"error: {ex.Message}");
 			return 1;
@@ -1427,20 +1437,35 @@ internal static class Program
 
 		// Parsing and validation deliberately precede opening the destination Pit. A rejected
 		// client payload therefore cannot create flags, directories, or partial state.
+		var items = itemsArray.Cast<JObject>().Select(item => new PitItem(item)).ToArray();
 		var pit = TrackPit(new Pit(pitFile, subscriber: CliSubscriber, readOnly: false));
+		Messages.WriteDebug($"{Icons.Info} Processing {pit.JsonFile.Name} Pit...");
+		PersistSeedBatch(pitFile.Name, items, pit.Add, () => pit.Save(),
+			() => ReleaseProcessWindow(pit, throwOnFailure: true));
+	}
+
+	// Internal I/O boundary: the real CLI uses Pit.Add/Save/Dispose. Tests can
+	// exercise failures at each persistence stage through the same receipt path.
+	internal static void PersistSeedBatch(string pitName, IReadOnlyList<PitItem> items,
+		Func<PitItem, bool> add, Action save, Action release)
+	{
+		var written = 0;
+		var unchanged = new List<string>();
 		try
 		{
-			Messages.WriteDebug($"{Icons.Info} Processing {pit.JsonFile.Name} Pit...");
-			// Keep the validated JSON token types. Re-parsing through JArray.Parse
-			// interprets ISO dates in ordinary fields using the machine's timezone.
-			pit.AddItems(itemsArray.Cast<JObject>().Select(item => new PitItem(item)));
-			pit.Save();
-			Messages.WriteSuccess($"[pits] Successfully committed {itemsArray.Count} entity(ies) to Pit '{pitFile.Name}'.");
+			foreach (var item in items)
+			{
+				if (add(item)) written++;
+				else unchanged.Add(item.Id);
+			}
+			save();
 		}
-		finally
-		{
-			ReleaseProcessWindow(pit);
-		}
+		finally { release(); }
+		// Never describe accepted in-memory changes as written before the required
+		// local durability boundary completes. This does not imply remote visibility.
+		if (Messages.Debug)
+			Console.Error.WriteLine($"[pits] Unchanged IDs: {new JArray(unchanged).ToString(Formatting.None)}");
+		Messages.WriteSuccess($"[pits] {items.Count} source items: {written} written, {unchanged.Count} unchanged (Pit '{pitName}').");
 	}
 
 	private static void ValidateStrictPatchTargets(PitFile pitFile, JArray itemsArray)
@@ -1669,7 +1694,7 @@ internal static class Program
 				ReleaseProcessWindow(pit);
 		}
 	}
-	private static void ReleaseProcessWindow(Pit pit)
+	private static void ReleaseProcessWindow(Pit pit, bool throwOnFailure = false)
 	{
 		if (Messages.RetainWindow)
 		{
@@ -1684,13 +1709,18 @@ internal static class Program
 			// CR003 durability boundary: Dispose publishes the tenure write set plus dirty
 			// fragments as ordinary change files, optionally completes a canonical save,
 			// then releases the process window, watcher, and path registration.
+			var processFlag = throwOnFailure ? pit.ProcessFlag() : null;
 			pit.Dispose();
+			if (processFlag is not null && processFlag.Exists() && processFlag.IsOwnedByCurrentProcess)
+				throw new JsonPitPersistenceException($"Could not release the process activity window for {pit.JsonFile.Name}.");
 			Messages.WriteDebug($"Disposed pit {pit.JsonFile.Name} and released its process activity window.");
 			lock (ActivePitsLock)
 				ActivePits.Remove(pit);
 		}
 		catch (Exception ex)
 		{
+			if (throwOnFailure)
+				throw new JsonPitPersistenceException($"Seed persistence/disposal failed for Pit '{pit.JsonFile.Name}': {ex.Message}", ex);
 			Messages.WriteDebug($"Could not release the process activity window for {pit.JsonFile.Name}; process-exit cleanup will retry: {ex.Message}");
 		}
 	}

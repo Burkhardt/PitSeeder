@@ -34,7 +34,7 @@ public sealed class StrictPatchSeedTests : IDisposable
 			option, "-r", root.FullPath, "-n");
 
 		Assert.Equal(0, run.exitCode);
-		Assert.Equal("[pits] Successfully committed 1 entity(ies) to Pit 'Person'.",
+		Assert.Equal("[pits] 1 source items: 1 written, 0 unchanged (Pit 'Person').",
 			run.output.Split('\n', StringSplitOptions.RemoveEmptyEntries)[^1].TrimEnd('\r'));
 		var alice = Assert.Single(Export());
 		Assert.Equal("Alice", alice["Name"]?.Value<string>());
@@ -102,7 +102,7 @@ public sealed class StrictPatchSeedTests : IDisposable
 			"-r", root.FullPath, "-n");
 
 		Assert.Equal(0, run.exitCode);
-		Assert.Contains("[pits] Successfully committed 1 entity(ies) to Pit 'Person'.", run.output);
+		Assert.Contains("[pits] 1 source items: 1 written, 0 unchanged (Pit 'Person').", run.output);
 		var ghost = Assert.Single(Export());
 		Assert.Equal("Ghost99", ghost["Id"]?.Value<string>());
 		Assert.Equal("Live", ghost["UseCase"]?.Value<string>());
@@ -147,7 +147,7 @@ public sealed class StrictPatchSeedTests : IDisposable
 			"-r", root.FullPath, "-n");
 
 		Assert.Equal(0, run.exitCode);
-		Assert.Contains("[pits] Successfully committed 0 entity(ies) to Pit 'Person'.", run.output);
+		Assert.Contains("[pits] 0 source items: 0 written, 0 unchanged (Pit 'Person').", run.output);
 	}
 
 	private void Seed(string payload)
