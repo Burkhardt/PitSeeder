@@ -14,7 +14,7 @@
 		<RepositoryUrl>https://github.com/Burkhardt/PitSeeder.git</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
-		<PackageReleaseNotes>Shared CLI help theme with window and strict-ID aliases, aligned columns, syntax emphasis, and contextual list/ls usage.</PackageReleaseNotes>
+		<PackageReleaseNotes>CR081: report written and unchanged source entries only after required local persistence; propagate seed disposal failures and preserve strict batch validation.</PackageReleaseNotes>
 		<OutputType>Exe</OutputType>
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
