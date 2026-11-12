@@ -6,17 +6,19 @@ namespace PitSeeder.Tests;
 public class PitRootCloudResolutionTests
 {
 	[Theory]
-	[InlineData("LiveAfricaStage")]
-	[InlineData("LiveAfricaStage/")]
-	[InlineData("/LiveAfricaStage")]
-	public void Help_WithOneDriveCloud_ResolvesPitRootUnderConfiguredCloudRoot(string pitRootArgument)
+	[InlineData("Dropbox", "RAIkeep.Test.Cli", "RAIkeep.Test.Cli")]
+	[InlineData("Dropbox", "RAIkeep.Test.Cli/", "RAIkeep.Test.Cli")]
+	[InlineData("Dropbox", "/RAIkeep.Test.Cli", "RAIkeep.Test.Cli")]
+	[InlineData("OneDrive", "AIA", "AIA")]
+	[InlineData("OneDrive", "AfricaStage", "AfricaStage")]
+	public void Help_WithExplicitCloud_ResolvesPitRootUnderConfiguredCloudRoot(string provider, string pitRootArgument, string tenant)
 	{
-		var oneDriveRoot = (string?)Os.Config?.Cloud?.OneDrive;
-		Assert.False(string.IsNullOrWhiteSpace(oneDriveRoot), "This test requires Os.Config.Cloud.OneDrive to be configured.");
+		var cloudRoot = (string?)Os.Config?.Cloud?[provider];
+		Assert.False(string.IsNullOrWhiteSpace(cloudRoot), $"This test requires Os.Config.Cloud.{provider} to be configured.");
 
-		var expectedPitRoot = new RaiPath(oneDriveRoot).FullPath + "LiveAfricaStage/";
+		var expectedPitRoot = (new RaiPath(cloudRoot) / tenant).FullPath;
 
-		var (exitCode, output) = InvokePitsMain("-h", "-c", "OneDrive", "-r", pitRootArgument);
+		var (exitCode, output) = InvokePitsMain("-h", "-c", provider, "-r", pitRootArgument);
 
 		Assert.Equal(0, exitCode);
 		Assert.NotNull(Messages.PitRoot);
