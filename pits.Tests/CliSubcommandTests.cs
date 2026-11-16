@@ -440,6 +440,57 @@ public sealed class CliSubcommandTests : IDisposable
 	}
 
 	[Fact]
+	public void Maintain_Apply_RetiresAccountedHistoricalChangesWhenStoreIsRequired()
+	{
+		var directory = (root / "Past").mkdir();
+		var past = DateTimeOffset.UtcNow.AddDays(-1);
+		using (var fixture = new JsonPit.Pit(directory, readOnly: false, unflagged: true, autoload: false))
+		{
+			var change = fixture.CreateChangeFile(new JsonPit.PitItem("Old", true, past), "Peer-cli-42");
+			fixture.Maintain(apply: true);
+			var receipt = new TextFile(JsonPit.ReceiptFile.PathFor(change.FullName).FullName)
+			{
+				Lines = [DateTimeOffset.UtcNow.AddMinutes(-11).ToString("o")], Changed = true
+			};
+			receipt.Save();
+			fixture.CreateChangeFile(new JsonPit.PitItem("Pending", true, past.AddMinutes(1)), "Peer-cli-42");
+		}
+
+		var apply = RunPits("maintain", "Past", "--apply", "--json", "-r", root.FullPath);
+		Assert.Equal(0, apply.exitCode);
+		var report = JObject.Parse(apply.output);
+		Assert.True((bool)report["CanonicalPersisted"]);
+		Assert.Equal(1, (int)report["ChangeFilesRemoved"]);
+		Assert.Equal(1, (int)report["ReceiptsRemoved"]);
+		Assert.Empty((JArray)report["Deferred"]);
+	}
+
+	[Fact]
+	public void Seed_OrdinaryWritableOpen_RetiresImportedChangeAndReceipt()
+	{
+		var directory = (root / "Person").mkdir();
+		var fragment = new JsonPit.PitItem("Imported", true, DateTimeOffset.UtcNow.AddDays(-1));
+		RaiFile change;
+		using (var fixture = new JsonPit.Pit(directory, readOnly: false, unflagged: true, autoload: false))
+		{
+			fixture.AddHistorical(fragment);
+			fixture.Save(force: true);
+			change = fixture.CreateChangeFile(fragment, "Peer-app-42");
+		}
+		var receipt = new TextFile(JsonPit.ReceiptFile.PathFor(change.FullName).FullName)
+		{
+			Lines = [DateTimeOffset.UtcNow.AddMinutes(-11).ToString("o")], Changed = true
+		};
+		receipt.Save();
+		var source = new TextFile(root, "new-person", "json5") { Lines = ["{Id:'NewEntry'}"], Changed = true };
+		source.Save();
+		var seed = RunPits("seed", "Person", "--source", source.FullName, "-r", root.FullPath, "-n");
+		Assert.Equal(0, seed.exitCode);
+		Assert.False(change.Exists());
+		Assert.False(receipt.Exists());
+	}
+
+	[Fact]
 	public void Maintain_ArchiveEvents_PreviewsThenApplies_AndAuditReadsTheArchive()
 	{
 		var pitPath = (root / "Activity").mkdir();
