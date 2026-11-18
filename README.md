@@ -1,5 +1,7 @@
 # PitSeeder
 
+[Code signing policy](https://github.com/Burkhardt/RAIkeep/blob/main/README_codesigning.md)
+
 ## CR081 seed disposition receipt (4.6.2 candidate)
 
 Seed receipts count source entries, including repeated IDs, using the engine's
