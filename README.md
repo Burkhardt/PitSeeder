@@ -1,7 +1,5 @@
 # PitSeeder
 
-[Code signing policy](https://github.com/Burkhardt/RAIkeep/blob/main/README_codesigning.md) · SignPath Foundation application in preparation; signing is not yet active.
-
 ## CR081 seed disposition receipt (4.6.2 candidate)
 
 Seed receipts count source entries, including repeated IDs, using the engine's
@@ -25,11 +23,11 @@ not against the projected state. A sparse patch matching projected values may
 therefore still append a fragment; distributed ordering and tombstones are preserved.
 
 
-## Latest Version 4.6.6
+## Latest Version 4.6.7
 
 Show the executing machine as "on <machine>" in the CLI banner. Size both decorative rules to the complete heading, including the hostname; preserve bold cyan styling and plain redirected output.
 
-Latest release notes: [PitSeeder 4.6.6 release notes](https://github.com/Burkhardt/RAIkeep/blob/main/doc/releases/v4.x/PitSeeder_RELEASE_NOTES_4.x.md#466).
+Latest release notes: [PitSeeder 4.6.7 release notes](https://github.com/Burkhardt/RAIkeep/blob/main/doc/releases/v4.x/PitSeeder_RELEASE_NOTES_4.x.md#467).
 
 ## Previous Versions
 
