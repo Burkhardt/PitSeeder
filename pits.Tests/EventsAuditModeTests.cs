@@ -73,8 +73,8 @@ public sealed class EventsAuditModeTests : IDisposable
 	}
 
 	private List<string> SnapshotPitDirectory() =>
-		Directory.EnumerateFileSystemEntries(pitDir.Path, "*", SearchOption.AllDirectories)
-			.Select(p => $"{p}|{(File.Exists(p) ? new FileInfo(p).Length : 0)}")
+		pitDir.EnumerateFiles("*", recursive: true).Select(file => $"{file.FullName}|{file.Length}")
+			.Concat(pitDir.EnumerateDirectories("*", SearchOption.AllDirectories).Select(dir => $"{dir.FullPath}|0"))
 			.OrderBy(p => p, StringComparer.Ordinal)
 			.ToList();
 
@@ -103,7 +103,7 @@ public sealed class EventsAuditModeTests : IDisposable
 		Assert.Equal(0, run.exitCode);
 		var jsonStart = run.output.IndexOf('[');
 		Assert.True(jsonStart >= 0, $"Expected a JSON array in output: {run.output}");
-		var parsed = JArray.Parse(run.output[jsonStart..]);
+		var parsed = CliOutputJson.Parse<JArray>(run.output[jsonStart..]);
 		// Inclusive minimum severity: Warning includes Warning and Error, excludes Debug/Information.
 		Assert.Equal(2, parsed.Count);
 		Assert.All(parsed, e => Assert.Contains((string?)e["Level"], new[] { "Warning", "Error" }));
@@ -114,19 +114,19 @@ public sealed class EventsAuditModeTests : IDisposable
 	{
 		var local = RunPits("audit", "-n", "-r", root.FullPath, PitName, "--machine", "local", "--json");
 		Assert.Equal(0, local.exitCode);
-		var localEvents = JArray.Parse(local.output[local.output.IndexOf('[')..]);
+		var localEvents = CliOutputJson.Parse<JArray>(local.output[local.output.IndexOf('[')..]);
 		Assert.Equal(2, localEvents.Count);
 		Assert.All(localEvents, e => Assert.Equal(Environment.MachineName, (string?)e["Machine"]));
 
 		var named = RunPits("audit", "-n", "-r", root.FullPath, PitName, "--machine", "Zebra", "--json");
 		Assert.Equal(0, named.exitCode);
-		var zebraEvents = JArray.Parse(named.output[named.output.IndexOf('[')..]);
+		var zebraEvents = CliOutputJson.Parse<JArray>(named.output[named.output.IndexOf('[')..]);
 		Assert.Equal(2, zebraEvents.Count);
 		Assert.All(zebraEvents, e => Assert.Equal("Zebra", (string?)e["Machine"]));
 
 		var all = RunPits("audit", "-n", "-r", root.FullPath, PitName, "--machine", "all", "--json");
 		Assert.Equal(0, all.exitCode);
-		Assert.Equal(4, JArray.Parse(all.output[all.output.IndexOf('[')..]).Count);
+		Assert.Equal(4, CliOutputJson.Parse<JArray>(all.output[all.output.IndexOf('[')..]).Count);
 	}
 
 	[Fact]
@@ -134,7 +134,7 @@ public sealed class EventsAuditModeTests : IDisposable
 	{
 		var mixedCase = RunPits("audit", "-n", "-r", root.FullPath, PitName, "--level", "ERROR", "--json");
 		Assert.Equal(0, mixedCase.exitCode);
-		Assert.Single(JArray.Parse(mixedCase.output[mixedCase.output.IndexOf('[')..]));
+		Assert.Single(CliOutputJson.Parse<JArray>(mixedCase.output[mixedCase.output.IndexOf('[')..]));
 
 		var before = SnapshotPitDirectory();
 		var invalid = RunPits("audit", "-n", "-r", root.FullPath, PitName, "--level", "loud");
@@ -156,7 +156,7 @@ public sealed class EventsAuditModeTests : IDisposable
 
 		var wwwa = RunPits("audit", "-n", "-r", root.FullPath, "--wwwa", "--json");
 		Assert.Equal(0, wwwa.exitCode);
-		Assert.Equal(4, JArray.Parse(wwwa.output[wwwa.output.IndexOf('[')..]).Count);
+		Assert.Equal(4, CliOutputJson.Parse<JArray>(wwwa.output[wwwa.output.IndexOf('[')..]).Count);
 		Assert.Equal(before, SnapshotPitDirectory());
 	}
 
@@ -175,7 +175,7 @@ public sealed class EventsAuditModeTests : IDisposable
 		var emptyPit = (root / "Object").mkdir();
 		var run = RunPits("audit", "-n", "-r", root.FullPath, "Object");
 		Assert.Equal(0, run.exitCode);
-		Assert.False(Directory.Exists((emptyPit / EventDirectory.Name).Path),
+		Assert.False(new RaiPath((emptyPit / EventDirectory.Name).Path).Exists(),
 			"A read-only audit must never create the Events directory.");
 	}
 

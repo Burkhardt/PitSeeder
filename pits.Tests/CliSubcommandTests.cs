@@ -18,6 +18,21 @@ public sealed class CliSubcommandTests : IDisposable
 	public void Dispose() => Cleanup();
 
 	[Fact]
+	public void QueriesReadTheSameSparseHistoryWithoutClaimingATicket()
+	{
+		CreatePit(root / "Object", "Shows", "First show");
+		var history = RunPits("history", "Object", "Shows", "-r", root.FullPath);
+		Assert.Equal(0, history.exitCode);
+		Assert.Equal("First show", (string?)CliOutputJson.Parse<JArray>(history.output).Single()["Payload"]);
+		var matches = RunPits("grep", "SHOW", "Object", "-r", root.FullPath, "-p", "Payload", "-i", "--json");
+		Assert.Equal(0, matches.exitCode);
+		var match = CliOutputJson.Parse<JArray>(matches.output).Single();
+		Assert.Equal("Shows", (string?)match["Id"]);
+		Assert.Equal("Object", (string?)match["_pit"]);
+		Assert.Empty((root / "Object").EnumerateFiles("*.flag"));
+	}
+
+	[Fact]
 	public void MissingConfigurationDiagnostic_DirectsOperatorToAmafu()
 	{
 		Assert.Equal(
@@ -162,7 +177,7 @@ public sealed class CliSubcommandTests : IDisposable
 
 		var export = RunPits("export", "Person", "--json", "-r", root.FullPath, "-n");
 		Assert.Equal(0, export.exitCode);
-		var payload = JArray.Parse(export.output[export.output.IndexOf('[')..]);
+		var payload = CliOutputJson.Parse<JArray>(export.output[export.output.IndexOf('[')..]);
 		Assert.Equal("CommandPerson", (string?)Assert.Single(payload)["Id"]);
 	}
 
@@ -181,7 +196,7 @@ public sealed class CliSubcommandTests : IDisposable
 
 		Assert.Equal(0, seed.exitCode);
 		Assert.Equal(0, export.exitCode);
-		var item = Assert.Single(JArray.Parse(export.output[export.output.IndexOf('[')..]));
+		var item = Assert.Single(CliOutputJson.Parse<JArray>(export.output[export.output.IndexOf('[')..]));
 		Assert.Equal("PerformLive", item["Id"]?.Value<string>());
 		Assert.Equal("UC", item["Kind"]?.Value<string>());
 	}
@@ -201,7 +216,7 @@ public sealed class CliSubcommandTests : IDisposable
 
 		Assert.Equal(0, seed.exitCode);
 		Assert.Equal(0, export.exitCode);
-		var ids = JArray.Parse(export.output[export.output.IndexOf('[')..])
+		var ids = CliOutputJson.Parse<JArray>(export.output[export.output.IndexOf('[')..])
 			.Select(item => item["Id"]?.Value<string>())
 			.OfType<string>()
 			.OrderBy(id => id)
@@ -286,7 +301,7 @@ public sealed class CliSubcommandTests : IDisposable
 
 		Assert.Equal(0, seed.exitCode);
 		Assert.Equal(0, export.exitCode);
-		var payloadArray = JArray.Parse(export.output[export.output.IndexOf('[')..]);
+		var payloadArray = CliOutputJson.Parse<JArray>(export.output[export.output.IndexOf('[')..]);
 		Assert.Equal("LeadingComment", (string?)Assert.Single(payloadArray)["Id"]);
 	}
 
@@ -338,13 +353,13 @@ public sealed class CliSubcommandTests : IDisposable
 		Assert.Equal(0, RunPits("seed", "Activity", "--source", source.FullName, "-r", root.FullPath, "-n").exitCode);
 
 		var deletion = RunPits(
-			"delete-property", "Activity", "DeleteNested", "What.Chat",
+			"del-prop", "Activity", "DeleteNested", "What.Chat",
 			"-r", root.FullPath, "-n");
 		Assert.Equal(0, deletion.exitCode);
 
 		var export = RunPits("export", "Activity", "--json", "-r", root.FullPath, "-n");
 		Assert.Equal(0, export.exitCode);
-		var item = Assert.Single(JArray.Parse(export.output[export.output.IndexOf('[')..]));
+		var item = Assert.Single(CliOutputJson.Parse<JArray>(export.output[export.output.IndexOf('[')..]));
 		var what = Assert.IsType<JObject>(item["What"]);
 		Assert.Equal("Guitar", what["Instrument"]?.Value<string>());
 		Assert.False(what.ContainsKey("Chat"));
@@ -361,12 +376,12 @@ public sealed class CliSubcommandTests : IDisposable
 		source.Save();
 		Assert.Equal(0, RunPits("seed", "Object", "--source", source.FullName, "-r", root.FullPath, "-n").exitCode);
 
-		var deletion = RunPits("delete-item", "Object", "LegacyRecord", "-r", root.FullPath, "-n");
+		var deletion = RunPits("del", "Object", "LegacyRecord", "-r", root.FullPath, "-n");
 		Assert.Equal(0, deletion.exitCode);
 
 		var export = RunPits("export", "Object", "--json", "-r", root.FullPath, "-n");
 		Assert.Equal(0, export.exitCode);
-		var items = JArray.Parse(export.output[export.output.IndexOf('[')..]);
+		var items = CliOutputJson.Parse<JArray>(export.output[export.output.IndexOf('[')..]);
 		Assert.Equal("Keep", (string?)Assert.Single(items)["Id"]);
 	}
 
@@ -399,7 +414,7 @@ public sealed class CliSubcommandTests : IDisposable
 		Assert.Equal(1, deletion.exitCode);
 		Assert.Contains("Cannot tombstone protected attribute", deletion.error);
 		var export = RunPits("export", "Person", "--json", "-r", root.FullPath, "-n");
-		var item = Assert.Single(JArray.Parse(export.output[export.output.IndexOf('[')..]));
+		var item = Assert.Single(CliOutputJson.Parse<JArray>(export.output[export.output.IndexOf('[')..]));
 		Assert.Equal("Musician", item["Role"]?.Value<string>());
 	}
 
@@ -425,14 +440,14 @@ public sealed class CliSubcommandTests : IDisposable
 
 		var report = RunPits("maintain", "Activity", "--json", "-r", root.FullPath);
 		Assert.Equal(0, report.exitCode);
-		var reportJson = JObject.Parse(report.output);
+		var reportJson = CliOutputJson.Parse<JObject>(report.output);
 		Assert.True((int?)reportJson["ChangeFilesEligible"] >= 1);
 		Assert.True(change.Exists());
 		Assert.True(receiptPath.Exists());
 
 		var apply = RunPits("maintain", "Activity", "--apply", "--json", "-r", root.FullPath);
 		Assert.Equal(0, apply.exitCode);
-		var applyJson = JObject.Parse(apply.output);
+		var applyJson = CliOutputJson.Parse<JObject>(apply.output);
 		Assert.Equal(1, (int?)applyJson["ChangeFilesRemoved"]);
 		Assert.False(change.Exists());
 		Assert.False(receiptPath.Exists());
@@ -458,11 +473,11 @@ public sealed class CliSubcommandTests : IDisposable
 
 		var apply = RunPits("maintain", "Past", "--apply", "--json", "-r", root.FullPath);
 		Assert.Equal(0, apply.exitCode);
-		var report = JObject.Parse(apply.output);
+		var report = CliOutputJson.Parse<JObject>(apply.output);
 		Assert.True((bool)report["CanonicalPersisted"]);
 		Assert.Equal(1, (int)report["ChangeFilesRemoved"]);
 		Assert.Equal(1, (int)report["ReceiptsRemoved"]);
-		Assert.Empty((JArray)report["Deferred"]);
+		Assert.Empty(Assert.IsType<JArray>(report["Deferred"]));
 	}
 
 	[Fact]
@@ -505,7 +520,7 @@ public sealed class CliSubcommandTests : IDisposable
 		var preview = RunPits(
 			"maintain", "Activity", "--archive-events", "--json", "-r", root.FullPath, "-n");
 		Assert.Equal(0, preview.exitCode);
-		var previewJson = JObject.Parse(preview.output);
+		var previewJson = CliOutputJson.Parse<JObject>(preview.output);
 		Assert.False((bool)previewJson["Applied"]!);
 		Assert.Equal(1, (int?)previewJson["EventFilesEligible"]);
 		Assert.Equal("Events_20260910-1435_to_20260910-1435.zip", (string?)previewJson["EventArchiveName"]);
@@ -515,7 +530,7 @@ public sealed class CliSubcommandTests : IDisposable
 		var apply = RunPits(
 			"maintain", "Activity", "--archive-events", "--apply", "--json", "-r", root.FullPath, "-n");
 		Assert.Equal(0, apply.exitCode);
-		var applyJson = JObject.Parse(apply.output);
+		var applyJson = CliOutputJson.Parse<JObject>(apply.output);
 		Assert.Equal(1, (int?)applyJson["EventArchivesCreated"]);
 		Assert.Equal(1, (int?)applyJson["EventFilesRemoved"]);
 		Assert.False(loose.Exists());
@@ -523,7 +538,7 @@ public sealed class CliSubcommandTests : IDisposable
 
 		var audit = RunPits("audit", "Activity", "--json", "-r", root.FullPath, "-n");
 		Assert.Equal(0, audit.exitCode);
-		var events = JArray.Parse(audit.output[audit.output.IndexOf('[')..]);
+		var events = CliOutputJson.Parse<JArray>(audit.output[audit.output.IndexOf('[')..]);
 		Assert.Equal("archivable event", (string?)Assert.Single(events)["Message"]);
 	}
 
@@ -547,7 +562,7 @@ public sealed class CliSubcommandTests : IDisposable
 			"maintain", "--wwwa", "--archive-events", "--apply", "--json", "-r", root.FullPath, "-n");
 
 		Assert.Equal(0, apply.exitCode);
-		var results = JArray.Parse(apply.output);
+		var results = CliOutputJson.Parse<JArray>(apply.output);
 		Assert.Equal(4, results.Count);
 		Assert.Equal(2, results.Count(result => (int?)result["EventArchivesCreated"] == 1));
 		Assert.False((root / "Person").Exists());
@@ -557,7 +572,7 @@ public sealed class CliSubcommandTests : IDisposable
 
 		var audit = RunPits("audit", "--wwwa", "--json", "-r", root.FullPath, "-n");
 		Assert.Equal(0, audit.exitCode);
-		Assert.Equal(2, JArray.Parse(audit.output[audit.output.IndexOf('[')..]).Count);
+		Assert.Equal(2, CliOutputJson.Parse<JArray>(audit.output[audit.output.IndexOf('[')..]).Count);
 	}
 
 	[Fact]
@@ -581,7 +596,7 @@ public sealed class CliSubcommandTests : IDisposable
 
 		var wwwa = RunPits("maintain", "--wwwa", "--json", "-r", root.FullPath);
 		Assert.Equal(0, wwwa.exitCode);
-		var results = JArray.Parse(wwwa.output);
+		var results = CliOutputJson.Parse<JArray>(wwwa.output);
 		Assert.Equal(4, results.Count);
 		Assert.False((root / "Person").Exists());
 		Assert.False((root / "Object").Exists());
@@ -595,13 +610,13 @@ public sealed class CliSubcommandTests : IDisposable
 	public void Maintain_WwwaWrongExistingRoot_FailsWithoutCreatingNestedPitDirectories()
 	{
 		var wrongRoot = (root / "Activity" / "AIA").mkdir();
-		var parentWriteTime = Directory.GetLastWriteTimeUtc(wrongRoot.FullPath);
+		var parentWriteTime = wrongRoot.LastWriteTimeUtc;
 
 		var result = RunPits("maintain", "--wwwa", "--json", "-r", wrongRoot.FullPath, "-n");
 
 		Assert.Equal(1, result.exitCode);
 		Assert.Contains("contains none of the WWWA pits", result.output, StringComparison.Ordinal);
-		Assert.Equal(parentWriteTime, Directory.GetLastWriteTimeUtc(wrongRoot.FullPath));
+		Assert.Equal(parentWriteTime, wrongRoot.LastWriteTimeUtc);
 		foreach (var name in new[] { "Activity", "Person", "Object", "Place" })
 			Assert.False((wrongRoot / name).Exists());
 	}
@@ -632,8 +647,8 @@ public sealed class CliSubcommandTests : IDisposable
 		Assert.Equal(0, legacy.exitCode);
 		Assert.Equal(0, command.exitCode);
 		Assert.Equal(
-			JArray.Parse(legacy.output[legacy.output.IndexOf('[')..]).ToString(),
-			JArray.Parse(command.output[command.output.IndexOf('[')..]).ToString());
+			CliOutputJson.Parse<JArray>(legacy.output[legacy.output.IndexOf('[')..]).ToString(),
+			CliOutputJson.Parse<JArray>(command.output[command.output.IndexOf('[')..]).ToString());
 	}
 
 	[Fact]
@@ -664,7 +679,7 @@ public sealed class CliSubcommandTests : IDisposable
 		var rootHelp = RunPits("--help");
 		Assert.Equal(0, rootHelp.exitCode);
 		Assert.DoesNotContain("===", rootHelp.output, StringComparison.Ordinal);
-		Assert.Contains("seed, export, audit, delete-property, delete-item, maintain", rootHelp.output, StringComparison.OrdinalIgnoreCase);
+		Assert.Contains("seed, export, grep, history, audit, delete-property, delete-item, maintain", rootHelp.output, StringComparison.OrdinalIgnoreCase);
 		Assert.DoesNotContain("(default)", rootHelp.output);
 		Assert.DoesNotContain(" PitRoot", rootHelp.output);
 		Assert.DoesNotContain("①", rootHelp.output, StringComparison.Ordinal);

@@ -189,6 +189,8 @@ are retained and reported in `Deferred` or `Failures`.
 
 ### Delete a nested property or item
 
+Seeding merges supplied properties and preserves omitted ones. Use `del-prop` (`delete-property`) to remove a property or `del` (`delete-item`) to remove the whole item.
+
 `delete-property` interprets `PropertyPath` as a dot-delimited JSON path. It
 appends a tombstone without overwriting sibling properties:
 

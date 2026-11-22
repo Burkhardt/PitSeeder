@@ -40,7 +40,7 @@ public sealed class PointInTimeExportTests : IDisposable
 		var afterExport = DateTimeOffset.UtcNow;
 
 		Assert.Equal(0, run.exitCode);
-		var document = JObject.Parse(run.output);
+		var document = CliOutputJson.Parse<JObject>(run.output);
 		Assert.Equal(T2, document["_export"]!["at"]!.ToObject<DateTimeOffset>());
 		var exported = document["_export"]!["exported"]!.ToObject<DateTimeOffset>();
 		Assert.InRange(exported, beforeExport, afterExport);
@@ -69,7 +69,7 @@ public sealed class PointInTimeExportTests : IDisposable
 			"-r", root.FullPath, "-n");
 
 		Assert.Equal(0, run.exitCode);
-		var item = Assert.Single((JArray)JObject.Parse(run.output)["data"]!);
+		var item = Assert.Single((JArray)CliOutputJson.Parse<JObject>(run.output)["data"]!);
 		var what = Assert.IsType<JObject>(item["What"]);
 		Assert.Equal("Guitar", what["Instrument"]?.Value<string>());
 		Assert.False(what.ContainsKey("Chat"));
@@ -118,7 +118,7 @@ public sealed class PointInTimeExportTests : IDisposable
 		Assert.Equal(0, historical.exitCode);
 		var historicalFile = new TextFile(historicalDirectory, "Person", "json");
 		Assert.True(historicalFile.Exists());
-		var document = JObject.Parse(historicalFile.ReadAllText());
+		var document = CliOutputJson.Parse<JObject>(historicalFile.ReadAllText());
 		Assert.NotNull(document["_export"]);
 		Assert.IsType<JArray>(document["data"]);
 
@@ -127,7 +127,7 @@ public sealed class PointInTimeExportTests : IDisposable
 			"-r", root.FullPath, "-n");
 		Assert.Equal(0, current.exitCode);
 		var currentFile = new TextFile(currentDirectory, "Person", "json");
-		Assert.IsType<JArray>(JToken.Parse(currentFile.ReadAllText()));
+		Assert.IsType<JArray>(CliOutputJson.Parse<JToken>(currentFile.ReadAllText()));
 	}
 
 	[Fact]
@@ -155,7 +155,7 @@ public sealed class PointInTimeExportTests : IDisposable
 			"-r", root.FullPath, "-n");
 
 		Assert.Equal(0, run.exitCode);
-		var document = JObject.Parse(run.output);
+		var document = CliOutputJson.Parse<JObject>(run.output);
 		var data = Assert.IsType<JObject>(document["data"]);
 		Assert.Empty(Assert.IsType<JArray>(data["Person"]));
 		Assert.Empty(Assert.IsType<JArray>(data["Place"]));
@@ -172,14 +172,14 @@ public sealed class PointInTimeExportTests : IDisposable
 			"export", "--wwwa", "--out-dir", exportDirectory.FullPath,
 			"--at", T2.ToString("O"), "-r", root.FullPath, "-n");
 		Assert.Equal(0, fileRun.exitCode);
-		var fileDocument = JObject.Parse(
+		var fileDocument = CliOutputJson.Parse<JObject>(
 			new TextFile(exportDirectory, "wwwa", "json").ReadAllText());
 		Assert.True(JToken.DeepEquals(document["data"], fileDocument["data"]));
 
 		var currentRun = RunPits(
 			"export", "--wwwa", "--json", "-r", root.FullPath, "-n");
 		Assert.Equal(0, currentRun.exitCode);
-		var current = JObject.Parse(currentRun.output);
+		var current = CliOutputJson.Parse<JObject>(currentRun.output);
 		Assert.Null(current["_export"]);
 		Assert.IsType<JArray>(current["Activity"]);
 	}
@@ -259,7 +259,7 @@ public sealed class PointInTimeExportTests : IDisposable
 			"export", pitName, "--json", "--at", at.ToString("O"),
 			"-r", root.FullPath, "-n");
 		Assert.Equal(0, run.exitCode);
-		return Assert.IsType<JArray>(JObject.Parse(run.output)["data"]);
+		return Assert.IsType<JArray>(CliOutputJson.Parse<JObject>(run.output)["data"]);
 	}
 
 	private void WriteHistoricalPit(string pitName, params PitItem[] fragments)

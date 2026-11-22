@@ -173,16 +173,16 @@ public sealed class StrictPatchSeedTests : IDisposable
 	{
 		var run = RunPits("export", "Person", "--json", "-r", root.FullPath, "-n");
 		Assert.Equal(0, run.exitCode);
-		return JArray.Parse(run.output[run.output.IndexOf('[')..]);
+		return CliOutputJson.Parse<JArray>(run.output[run.output.IndexOf('[')..]);
 	}
 
 	private IReadOnlyList<string> SnapshotPitDirectory()
 	{
 		var pitDirectory = root / "Person";
 		if (!pitDirectory.Exists()) return [];
-		return Directory.GetFiles(pitDirectory.FullPath, "*", SearchOption.AllDirectories)
-			.OrderBy(path => path, StringComparer.Ordinal)
-			.Select(path => $"{Path.GetRelativePath(pitDirectory.FullPath, path)}:{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)))}")
+		return pitDirectory.EnumerateFiles("*", recursive: true)
+			.OrderBy(file => file.FullName, StringComparer.Ordinal)
+			.Select(file => $"{pitDirectory.RelativeFileName(file)}:{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(file.ReadAllBytes()))}")
 			.ToArray();
 	}
 

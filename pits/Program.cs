@@ -62,12 +62,14 @@ public static class Messages
 	private const string Green = "32";
 	private static readonly string[] CommandHelp =
 	[
+		"pits grep <pattern> [<target>] [-i] [-e] [-p <property>] [--at <ts>] [--with-deleted] [--json] [--jq <expr>]",
+		"pits history <PitName> <ItemId> [--jq <expr>]",
 		"pits list -r <tenant|path> [-c <cloud>] [-a|--all] [-l|--long]",
-		"pits seed <PitName> --source <file|-> [-x|--id-exists|--patch]",
+		"pits seed <PitName> --source <file|-> [-x|--id-exists|--patch] (alias: add)",
 		"pits export (<PitName>|--wwwa) (--out-dir <dir>|--json) [--at <ISO-8601 timestamp>]",
 		"pits audit <PitName> [--machine <all|local|name>] [--level <severity>] [--json]",
-		"pits delete-property <PitName> <ItemId> <PropertyPath>",
-		"pits delete-item <PitName> <ItemId>",
+		"pits delete-property <PitName> <ItemId> <PropertyPath> (alias: del-prop)",
+		"pits delete-item <PitName> <ItemId> (alias: del)",
 		"pits maintain (<PitName>|--wwwa) [--apply] [--archive-events] [--json]"
 	];
 	private static HelpRow[] OptionHelp =>
@@ -117,10 +119,11 @@ public static class Messages
 		var lines = new List<string>
 		{
 			FormatRow(new("Commands:", Icons.Info,
-				"list, seed, export, audit, delete-property, delete-item, maintain"))
+				"list, seed, export, grep, history, audit, delete-property, delete-item, maintain"))
 		};
 		foreach (var command in CommandHelp)
 			lines.Add("  " + HelpSyntax.Format(command, Cyan, useColor));
+		lines.Add("  seed/add preserves omitted properties. Use del-prop to remove a property.");
 		lines.Add("");
 		lines.Add(Paint("Options:", Cyan, useColor));
 		lines.AddRange(rows.Take(options.Length).Select(FormatRow));
@@ -302,7 +305,7 @@ internal static class Program
 	private const string CliSubscriber = "pits";
 	private static readonly string[] Commands =
 	[
-		"list", "ls", "seed", "export", "audit", "delete-property", "delete-item", "maintain"
+		"list", "ls", "seed", "add", "grep", "history", "export", "audit", "delete-property", "del-prop", "delete-item", "del", "maintain"
 	];
 	private static readonly object ActivePitsLock = new();
 	private static readonly HashSet<Pit> ActivePits = [];
@@ -313,6 +316,12 @@ internal static class Program
 	}
 	private static int Main(string[] args)
 	{
+		args = ReplaceOption(args, "--root", "--pitroot");
+		if (args.FirstOrDefault() is "put" or "set" or "get" or "delete" or "status" or "rename")
+		{
+			Console.Error.WriteLine($"Unknown command '{args[0]}'. See pits --help.");
+			return 2;
+		}
 		if (HasOption(args, "-v", "--version"))
 			return RunMappedArguments(args);
 
@@ -520,7 +529,7 @@ internal static class Program
 			if (wwwa && !string.IsNullOrWhiteSpace(sourceParam) && !sourceParam.EndsWith(".pit", StringComparison.OrdinalIgnoreCase))
 			{
 				RequireExplicitMutationLocation(args, "seed");
-				var sourceDir = new RaiPath(sourceParam.EndsWith(Os.DIR) ? sourceParam : sourceParam + Os.DIR);
+				var sourceDir = new RaiPath(sourceParam);
 				return RunBulkSeed(sourceDir, pitRoot!);
 			}
 			// WWWA export to file
@@ -617,11 +626,12 @@ internal static class Program
 			return command switch
 			{
 				"list" or "ls" => RunListCommand(args),
-				"seed" => seedOperation is null ? RunSeedCommand(args) : seedOperation(),
+				"seed" or "add" => seedOperation is null ? RunSeedCommand(args) : seedOperation(),
 				"export" => RunExportCommand(args),
+				"grep" or "history" => RunQuery(command, args),
 				"audit" => RunAuditCommand(args),
-				"delete-property" => RunDeletePropertyCommand(args),
-				"delete-item" => RunDeleteItemCommand(args),
+				"delete-property" or "del-prop" => RunDeletePropertyCommand(args),
+				"delete-item" or "del" => RunDeleteItemCommand(args),
 				"maintain" => RunMaintainCommand(args),
 				_ => throw new ArgumentException($"Unknown command '{command}'.")
 			};
@@ -811,6 +821,7 @@ internal static class Program
 
 	private static int RunSeedCommand(string[] args)
 	{
+		args = ReplaceOption(args, "-s", "--source");
 		var valueOptions = GlobalValueOptions.Concat(["--source"]).ToHashSet(StringComparer.Ordinal);
 		var allowed = GlobalSwitchOptions.Concat(valueOptions).Concat([
 			"--wwwa", "-x", "--id-exists", "--require-exist", "--require-existing", "--patch"
@@ -833,6 +844,96 @@ internal static class Program
 		RequireExplicitMutationLocation(args, "seed");
 
 		return RunMappedArguments(args);
+	}
+
+	private static IEnumerable<PitFile> QueryFiles(string[] args, string? target)
+	{
+		if (target is not null && target.EndsWith(".pit", StringComparison.OrdinalIgnoreCase))
+		{
+			yield return new PitFile(target);
+			yield break;
+		}
+		var tenant = ParamValue(args, "-r", "--pitroot");
+		var cloud = ParamValue(args, "-c", "--cloudprovider", "--cloud");
+		RaiPath root;
+		if (target is not null && target != "." && IsExplicitLocalDirectory(target))
+			root = new RaiPath(target);
+		else
+		{
+			if (tenant is not null && IsExplicitLocalDirectory(tenant)) root = new RaiPath(tenant);
+			else if (tenant is null && cloud is null && target is null or ".") root = new RaiPath(Environment.CurrentDirectory);
+			else
+			{
+				var provider = ResolveCloudProvider(cloud) ?? Messages.CloudProviderOptions().FirstOrDefault()
+					?? throw new ArgumentException(MissingConfigurationDiagnostic());
+				root = ResolveCloudRoot(provider, tenant);
+			}
+			if (target is not null && target != ".") root /= target;
+		}
+		if (!root.Exists()) yield break;
+		foreach (var file in root.EnumerateFiles("*.pit").OrderBy(file => file.FullName, StringComparer.Ordinal))
+			yield return new PitFile(file.FullName);
+		foreach (var directory in root.EnumerateDirectories("*").OrderBy(dir => dir.FullPath, StringComparer.Ordinal))
+		{
+			var name = LocalFileSystem.LeafName(LocalFileSystem.AbsoluteName(directory.FullPath));
+			var file = new PitFile(directory, name);
+			if (file.Exists()) yield return file;
+		}
+	}
+
+	private static int RunQuery(string command, string[] args)
+	{
+		var history = command == "history";
+		var values = GlobalValueOptions.Concat(history ? new[] { "--jq" } : new[] { "--jq", "-p", "--property", "--at" }).ToHashSet();
+		var allowed = values.Concat(GlobalSwitchOptions).ToHashSet();
+		if (!history) allowed.UnionWith(["-i", "--ignore-case", "-e", "--regex", "--with-deleted", "--json"]);
+		var positional = ValidateCommandTokens(args, allowed, values);
+		if (positional.Count is < 1 or > 2 || history && positional.Count != 2)
+			throw new ArgumentException(history ? "history requires <PitName> <ItemId>." : "grep requires <pattern> [<target>].");
+		var files = QueryFiles(args, history ? positional[0] : positional.ElementAtOrDefault(1)).ToArray();
+		if (files.Length == 0 || files.Any(file => !file.Exists()) || history && files.Length != 1)
+			throw new ArgumentException("Specify an existing pit for this query.");
+		var result = new JArray();
+		var pattern = history ? null : new Regex(HasOption(args, "-e", "--regex") ? positional[0] : Regex.Escape(positional[0]),
+			RegexOptions.CultureInvariant | (HasOption(args, "-i", "--ignore-case") ? RegexOptions.IgnoreCase : RegexOptions.None),
+			TimeSpan.FromSeconds(2));
+		var at = ParamValue(args, "--at") is { } timestamp ? ParseProjectionTimestamp(timestamp) : DateTimeOffset.MaxValue;
+		var property = ParamValue(args, "-p", "--property");
+		var filter = ParamValue(args, "--jq");
+		var json = history || filter is not null || HasOption(args, "--json");
+		foreach (var file in files)
+		{
+			using var pit = new Pit(file, subscriber: CliSubscriber, readOnly: true);
+			if (history)
+			{
+				if (!pit.HistoricItems.TryGetValue(positional[1], out var fragments))
+					throw new ArgumentException($"No history for '{positional[1]}' in '{file.Name}'.");
+				foreach (var fragment in fragments.History) result.Add(fragment.DeepClone());
+				continue;
+			}
+			foreach (var id in pit.HistoricItems.Keys.Order(StringComparer.Ordinal))
+			{
+				var item = pit.GetAt(id, at, withDeleted: HasOption(args, "--with-deleted"));
+				if (item is null) continue;
+				IEnumerable<JToken?> fields = property is null ? item.Properties().Select(p => (JToken?)p.Value)
+					: new[] { property.Split('.').Aggregate((JToken?)item, (node, key) => (node as JObject)?[key]) };
+				if (!fields.Any(field => field is not null && pattern!.IsMatch(field.Type == JTokenType.String
+					? field.Value<string>()! : field.ToString(Formatting.None)))) continue;
+				var record = (JObject)item.DeepClone();
+				record["_pit"] = file.Name;
+				if (json) result.Add(record);
+				else Console.WriteLine($"[{file.Name} : {id}] {record["Name"] ?? id}");
+			}
+		}
+		if (filter is not null)
+		{
+			var jq = new RaiSystem("jq", new[] { filter }) { StandardInput = result.ToString() }.ExecResult();
+			Console.Write(jq.StandardOutput);
+			Console.Error.Write(jq.StandardError);
+			return jq.ExitCode;
+		}
+		if (json) Console.WriteLine(result.ToString(Formatting.Indented));
+		return 0;
 	}
 
 	private static int RunExportCommand(string[] args)
@@ -1059,17 +1160,14 @@ internal static class Program
 		var explicitlyQualified = supplied == "."
 			|| supplied == "~"
 			|| supplied.StartsWith(Os.DIR, StringComparison.Ordinal)
-			|| supplied.StartsWith("." + Os.DIR, StringComparison.Ordinal)
-			|| supplied.StartsWith("~" + Os.DIR, StringComparison.Ordinal)
+			|| (supplied.Length >= 2 && supplied[0] is '.' or '~' && supplied[1] == Os.DIR[0])
 			|| (Os.IsWindows && supplied.Length > 2 && supplied[1] == ':' &&
 				supplied[2..].StartsWith(Os.DIR, StringComparison.Ordinal));
 		if (!explicitlyQualified) return false;
 
 		try
 		{
-			// RaiPath treats a non-terminated final segment as a file name. A command
-			// line root is explicitly a directory, so preserve its final segment.
-			_ = new RaiPath(root.EndsWith(Os.DIR, StringComparison.Ordinal) ? root : root + Os.DIR);
+			_ = new RaiPath(root);
 			return true;
 		}
 		catch
@@ -1147,7 +1245,7 @@ internal static class Program
 				item.DeletePropertyPath(propertyPath);
 			}
 
-			pit.Save();
+			SaveMutation(pit);
 			var operation = propertyPath is null
 				? $"Deleted item '{itemId}'"
 				: $"Deleted property '{propertyPath}' from item '{itemId}'";
@@ -1254,11 +1352,13 @@ internal static class Program
 	{
 		var lines = command switch
 		{
-			"seed" => new[]
+			"grep" => new[] { "Usage: pits grep <pattern> [<target>] [-i] [-e] [-p <property>] [--at <ts>] [--with-deleted] [--json] [--jq <expr>]" },
+			"history" => new[] { "Usage: pits history <PitName> <ItemId> [--jq <expr>]" },
+			"seed" or "add" => new[]
 			{
 				"Usage: pits seed <PitName> --source <file|-> [-x|--id-exists|--patch] [global options]",
 				"       pits seed --wwwa --source <directory> [global options]",
-				"Imports JSON/JSON5 into one pit or the four WWWA pits.",
+				"seed/add merges supplied properties. Omitted properties are preserved. Use del-prop to remove a property.",
 				"-x, --id-exists, --patch    reject missing or tombstoned IDs before opening the Pit for write."
 			},
 			"list" or "ls" => new[]
@@ -1279,15 +1379,15 @@ internal static class Program
 				"Usage: pits audit (<PitName>|--wwwa) [--machine <all|local|name>] [--level <severity>] [--json] [global options]",
 				"Reads durable events without opening a Pit or creating coordination artifacts."
 			},
-			"delete-property" => new[]
+			"delete-property" or "del-prop" => new[]
 			{
 				"Usage: pits delete-property <PitName> <ItemId> <PropertyPath> [global options]",
-				"Appends a property tombstone; PropertyPath accepts dot notation such as What.Chat."
+				"Alias: del-prop. Appends a property tombstone; PropertyPath accepts dot notation such as What.Chat."
 			},
-			"delete-item" => new[]
+			"delete-item" or "del" => new[]
 			{
 				"Usage: pits delete-item <PitName> <ItemId> [global options]",
-				"Appends an item tombstone so projected reads and exports omit the item."
+				"Alias: del. Appends an item tombstone so projected reads and exports omit the item."
 			},
 			"maintain" => new[]
 			{
@@ -1440,8 +1540,18 @@ internal static class Program
 		var items = itemsArray.Cast<JObject>().Select(item => new PitItem(item)).ToArray();
 		var pit = TrackPit(new Pit(pitFile, subscriber: CliSubscriber, readOnly: false));
 		Messages.WriteDebug($"{Icons.Info} Processing {pit.JsonFile.Name} Pit...");
-		PersistSeedBatch(pitFile.Name, items, pit.Add, () => pit.Save(),
+		PersistSeedBatch(pitFile.Name, items, pit.Add, () => SaveMutation(pit),
 			() => ReleaseProcessWindow(pit, throwOnFailure: true));
+	}
+
+	private static void SaveMutation(Pit pit)
+	{
+		bool hadChanges = pit.Invalid();
+		var saved = pit.SaveWithOutcome();
+		if (saved.Outcome == PitSaveOutcome.PitNotLoaded || (hadChanges && saved.Outcome == PitSaveOutcome.NothingToWrite))
+			throw new JsonPitPersistenceException($"Could not persist {pit.JsonFile.Name}: {saved.Outcome}.");
+		if (Messages.Debug)
+			Console.Error.WriteLine($"[pits] Save: {saved.Outcome}, change-file fragments: {saved.FragmentCount}");
 	}
 
 	// Internal I/O boundary: the real CLI uses Pit.Add/Save/Dispose. Tests can
