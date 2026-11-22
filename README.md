@@ -23,11 +23,11 @@ not against the projected state. A sparse patch matching projected values may
 therefore still append a fragment; distributed ordering and tombstones are preserved.
 
 
-## Latest Version 4.6.7
+## Latest Version 4.7.0
 
 Show the executing machine as "on <machine>" in the CLI banner. Size both decorative rules to the complete heading, including the hostname; preserve bold cyan styling and plain redirected output.
 
-Latest release notes: [PitSeeder 4.6.7 release notes](https://github.com/Burkhardt/RAIkeep/blob/main/doc/releases/v4.x/PitSeeder_RELEASE_NOTES_4.x.md#467).
+Latest release notes: [PitSeeder 4.7.0 release notes](https://github.com/Burkhardt/RAIkeep/blob/main/doc/releases/v4.x/PitSeeder_RELEASE_NOTES_4.x.md#470).
 
 ## Previous Versions
 
